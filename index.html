@@ -13,10 +13,13 @@
   <main id="board"></main>
 
   <dialog id="card-dialog">
+    <div class="card-view"></div>
     <form method="dialog">
-      <label>Title<input name="title" required></label>
-      <label>Description<textarea name="description" rows="3"></textarea></label>
-      <fieldset id="tag-options"><legend>Tags</legend></fieldset>
+      <div class="card-edit">
+        <label>Title<input name="title" required></label>
+        <label>Description<textarea name="description" rows="3"></textarea></label>
+        <fieldset id="tag-options"><legend>Tags</legend></fieldset>
+      </div>
       <div class="view-actions">
         <button type="button" class="edit-btn">Edit</button>
         <button value="cancel" type="submit" formnovalidate>Close</button>
@@ -41,11 +44,13 @@
         let editingCard = null;
         let targetUl = null;
 
-        const fields = () => [form.title, form.description, ...form.querySelectorAll('input[name="tags"]')];
+        const cardView = dialog.querySelector(".card-view");
+        const cardEditDiv = dialog.querySelector(".card-edit");
 
         function setMode(mode) {
           const viewing = mode === "view";
-          fields().forEach(f => f.disabled = viewing);
+          cardView.hidden = !viewing;
+          cardEditDiv.hidden = viewing;
           dialog.querySelector(".view-actions").hidden = !viewing;
           dialog.querySelector(".edit-actions").hidden = viewing;
           dialog.querySelector(".delete-btn").hidden = !editingCard;
@@ -85,15 +90,30 @@
           };
         }
 
+        function populateForm(cardData) {
+          form.title.value = cardData.title;
+          form.description.value = cardData.description;
+          form.querySelectorAll('input[name="tags"]').forEach(cb => {
+            cb.checked = cardData.tags.includes(cb.value);
+          });
+        }
+
+        function renderView(cardData) {
+          cardView.innerHTML = `
+            <strong>${cardData.title}</strong>
+            ${cardData.description ? `<p>${cardData.description}</p>` : ""}
+            ${cardData.tags.length ? `<div class="tags">${cardData.tags.map(t =>
+              `<span class="tag" style="background:${data.tags[t]}">${t}</span>`
+            ).join("")}</div>` : ""}
+          `;
+        }
+
         function openDialog(card, mode) {
           if (card) {
             editingCard = card;
             const cardData = readCard(card);
-            form.title.value = cardData.title;
-            form.description.value = cardData.description;
-            form.querySelectorAll('input[name="tags"]').forEach(cb => {
-              cb.checked = cardData.tags.includes(cb.value);
-            });
+            populateForm(cardData);
+            renderView(cardData);
           }
           setMode(mode);
           dialog.showModal();
