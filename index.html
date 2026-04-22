@@ -17,7 +17,11 @@
       <label>Title<input name="title" required></label>
       <label>Description<textarea name="description" rows="3"></textarea></label>
       <fieldset id="tag-options"><legend>Tags</legend></fieldset>
-      <div class="dialog-actions">
+      <div class="view-actions">
+        <button type="button" class="edit-btn">Edit</button>
+        <button value="cancel" type="submit" formnovalidate>Close</button>
+      </div>
+      <div class="edit-actions">
         <button value="save" type="submit">Save</button>
         <button value="cancel" type="submit" formnovalidate>Cancel</button>
         <button value="delete" type="submit" formnovalidate class="delete-btn">Delete</button>
@@ -36,6 +40,16 @@
         const tagOptions = document.getElementById("tag-options");
         let editingCard = null;
         let targetUl = null;
+
+        const fields = () => [form.title, form.description, ...form.querySelectorAll('input[name="tags"]')];
+
+        function setMode(mode) {
+          const viewing = mode === "view";
+          fields().forEach(f => f.disabled = viewing);
+          dialog.querySelector(".view-actions").hidden = !viewing;
+          dialog.querySelector(".edit-actions").hidden = viewing;
+          dialog.querySelector(".delete-btn").hidden = !editingCard;
+        }
 
         // build tag checkboxes
         for (const [name, color] of Object.entries(data.tags)) {
@@ -71,6 +85,20 @@
           };
         }
 
+        function openDialog(card, mode) {
+          if (card) {
+            editingCard = card;
+            const cardData = readCard(card);
+            form.title.value = cardData.title;
+            form.description.value = cardData.description;
+            form.querySelectorAll('input[name="tags"]').forEach(cb => {
+              cb.checked = cardData.tags.includes(cb.value);
+            });
+          }
+          setMode(mode);
+          dialog.showModal();
+        }
+
         // render columns
         for (const col of data.columns) {
           const section = document.createElement("section");
@@ -91,7 +119,6 @@
           board.appendChild(section);
         }
 
-        // open dialog for new card
         board.addEventListener("click", e => {
           const addLink = e.target.closest(".add-card");
           if (addLink) {
@@ -99,25 +126,18 @@
             editingCard = null;
             targetUl = addLink.closest(".column").querySelector("ul");
             form.reset();
-            dialog.querySelector(".delete-btn").hidden = true;
-            dialog.showModal();
+            openDialog(null, "edit");
             return;
           }
 
           const card = e.target.closest(".card");
           if (card) {
-            editingCard = card;
             targetUl = null;
-            const cardData = readCard(card);
-            form.title.value = cardData.title;
-            form.description.value = cardData.description;
-            form.querySelectorAll('input[name="tags"]').forEach(cb => {
-              cb.checked = cardData.tags.includes(cb.value);
-            });
-            dialog.querySelector(".delete-btn").hidden = false;
-            dialog.showModal();
+            openDialog(card, "view");
           }
         });
+
+        dialog.querySelector(".edit-btn").addEventListener("click", () => setMode("edit"));
 
         dialog.addEventListener("click", e => {
           if (e.target === dialog) dialog.close("cancel");
