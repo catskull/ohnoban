@@ -9,6 +9,7 @@
 <body>
   <header>
     <h1 id="board-title"></h1>
+    <button id="add-column-btn" type="button" title="Add column">+ Column</button>
     <button id="settings-btn" type="button" title="Board settings">&#9881;</button>
   </header>
   <main id="board"></main>
@@ -126,28 +127,63 @@
       }
 
       // --- board rendering ---
+      function renderColumn(col) {
+        const section = document.createElement("section");
+        section.className = "column";
+        section.dataset.columnId = col.id;
+
+        const header = document.createElement("h2");
+        header.innerHTML = `${esc(col.title)}<span class="count">${col.cards.length}</span>`;
+
+        const colActions = document.createElement("span");
+        colActions.className = "col-actions";
+        colActions.innerHTML = `<button class="col-move-btn" data-dir="left" title="Move left">\u2039</button><button class="col-move-btn" data-dir="right" title="Move right">\u203a</button><button class="col-delete-btn" title="Delete column">\u00d7</button>`;
+        colActions.querySelector(".col-delete-btn").addEventListener("click", () => {
+          const cards = section.querySelectorAll(".card").length;
+          if (cards > 0 && !confirm(`Delete "${col.title}" and its ${cards} card${cards > 1 ? "s" : ""}?`)) return;
+          section.remove();
+          save();
+        });
+        colActions.addEventListener("click", e => {
+          const btn = e.target.closest(".col-move-btn");
+          if (!btn) return;
+          const sibling = btn.dataset.dir === "left" ? section.previousElementSibling : section.nextElementSibling;
+          if (!sibling || !sibling.classList.contains("column")) return;
+          if (btn.dataset.dir === "left") {
+            board.insertBefore(section, sibling);
+          } else {
+            board.insertBefore(sibling, section);
+          }
+          save();
+        });
+        header.appendChild(colActions);
+
+        const addLink = document.createElement("a");
+        addLink.className = "add-card";
+        addLink.textContent = "+ Add card";
+        addLink.href = "#";
+
+        const ul = document.createElement("ul");
+        for (const card of col.cards) ul.appendChild(renderCard(card));
+
+        section.append(header, addLink, ul);
+        return section;
+      }
+
       function renderBoard() {
         board.innerHTML = "";
         for (const col of data.columns) {
-          const section = document.createElement("section");
-          section.className = "column";
-          section.dataset.columnId = col.id;
-
-          const header = document.createElement("h2");
-          header.innerHTML = `${col.title}<span class="count">${col.cards.length}</span>`;
-
-          const addLink = document.createElement("a");
-          addLink.className = "add-card";
-          addLink.textContent = "+ Add card";
-          addLink.href = "#";
-
-          const ul = document.createElement("ul");
-          for (const card of col.cards) ul.appendChild(renderCard(card));
-
-          section.append(header, addLink, ul);
-          board.appendChild(section);
+          board.appendChild(renderColumn(col));
         }
       }
+
+      document.getElementById("add-column-btn").addEventListener("click", () => {
+        const title = prompt("Column name:");
+        if (!title?.trim()) return;
+        const id = title.trim().toLowerCase().replace(/\s+/g, "-");
+        board.appendChild(renderColumn({ id, title: title.trim(), cards: [] }));
+        save();
+      });
       renderBoard();
 
       // --- card dialog ---
