@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ohnoban</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1 id="board-title"></h1>
+  </header>
+  <main id="board"></main>
+  <script>
+    fetch("board.json")
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById("board-title").textContent = data.title;
+        const board = document.getElementById("board");
+        for (const col of data.columns) {
+          const section = document.createElement("section");
+          section.className = "column";
+          section.innerHTML = `
+            <h2>${col.title}<span class="count">${col.cards.length}</span></h2>
+            <ul>
+              ${col.cards.map(card => `
+                <li class="card">
+                  <strong>${card.title}</strong>
+                  ${card.description ? `<p>${card.description}</p>` : ""}
+                  ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
+                    `<span class="tag" style="background:${data.tags[t]}">${t}</span>`
+                  ).join("")}</div>` : ""}
+                </li>
+              `).join("")}
+            </ul>
+          `;
+          board.appendChild(section);
+        }
+      });
+  </script>
+</body>
+</html>

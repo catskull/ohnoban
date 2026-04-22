@@ -1,0 +1,35 @@
+{
+  "title": "My Board",
+  "tags": {
+    "bug":      "#c23030",
+    "feature":  "#2b4f8e",
+    "design":   "#6b4c8a",
+    "research": "#2a9d8f",
+    "urgent":   "#b85535",
+    "blocked":  "#d4a030",
+    "low":      "#8a9a5b",
+    "review":   "#9b3060"
+  },
+  "columns": [
+    {
+      "id": "backlog",
+      "title": "Backlog",
+      "cards": [
+        { "id": "1", "title": "Research storage options", "description": "Look into localStorage vs IndexedDB", "tags": ["research"] },
+        { "id": "2", "title": "Design card layout", "tags": ["design", "low"] }
+      ]
+    },
+    {
+      "id": "doing",
+      "title": "Doing",
+      "cards": [
+        { "id": "3", "title": "Build basic HTML structure", "description": "Static page with JSON-driven rendering", "tags": ["feature"] }
+      ]
+    },
+    {
+      "id": "done",
+      "title": "Done",
+      "cards": []
+    }
+  ]
+}
