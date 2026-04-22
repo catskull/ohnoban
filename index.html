@@ -72,12 +72,16 @@
           return li;
         }
 
-        function fillCard(li, card) {
-          li.innerHTML = `
-            <strong>${card.title}</strong>
-            ${card.description ? `<p>${card.description}</p>` : ""}
+        function esc(s) {
+          return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function fillCard(el, card) {
+          el.innerHTML = `
+            <strong>${esc(card.title)}</strong>
+            ${card.description ? `<p>${esc(card.description)}</p>` : ""}
             ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
-              `<span class="tag" style="background:${data.tags[t]}">${t}</span>`
+              `<span class="tag" style="background:${data.tags[t]}">${esc(t)}</span>`
             ).join("")}</div>` : ""}
           `;
         }
@@ -98,22 +102,12 @@
           });
         }
 
-        function renderView(cardData) {
-          cardView.innerHTML = `
-            <strong>${cardData.title}</strong>
-            ${cardData.description ? `<p>${cardData.description}</p>` : ""}
-            ${cardData.tags.length ? `<div class="tags">${cardData.tags.map(t =>
-              `<span class="tag" style="background:${data.tags[t]}">${t}</span>`
-            ).join("")}</div>` : ""}
-          `;
-        }
-
         function openDialog(card, mode) {
           if (card) {
             editingCard = card;
             const cardData = readCard(card);
             populateForm(cardData);
-            renderView(cardData);
+            fillCard(cardView, cardData);
           }
           setMode(mode);
           dialog.showModal();
