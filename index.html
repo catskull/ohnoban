@@ -119,6 +119,10 @@
           }
         });
 
+        dialog.addEventListener("click", e => {
+          if (e.target === dialog) dialog.close("cancel");
+        });
+
         // handle dialog close
         dialog.addEventListener("close", () => {
           if (dialog.returnValue === "save") {
