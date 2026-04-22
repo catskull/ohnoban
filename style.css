@@ -12,3 +12,21 @@ ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
 .card p { margin-top: .25rem; }
 .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
 .tag { font-size: .7rem; font-weight: 600; color: #fff; padding: .15rem .5rem; border-radius: .25rem; }
+
+.add-card { display: block; text-align: center; padding: .4rem; margin-bottom: .5rem; font-size: .8rem; color: #666; text-decoration: none; border: 2px dashed #ccc; border-radius: .25rem; }
+.add-card:hover { color: #000; border-color: #999; }
+
+dialog { border: 3px solid #000; padding: 0; width: 360px; max-width: 90vw; }
+dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog form { display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem; }
+dialog label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; font-weight: 600; }
+dialog input[name="title"], dialog textarea { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; outline: none; }
+dialog input[name="title"]:focus, dialog textarea:focus { border-color: #0b6ff3; }
+dialog fieldset { border: none; padding: 0; min-inline-size: 0; }
+dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
+.tag-option { flex-direction: row; align-items: center; gap: .4rem; font-weight: normal; cursor: pointer; }
+#tag-options { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dialog-actions { display: flex; gap: .5rem; padding-top: .25rem; }
+.dialog-actions button { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; }
+.dialog-actions button[value="cancel"] { background: #fff; color: #000; }
+.delete-btn { background: #c23030 !important; border-color: #c23030 !important; color: #fff !important; margin-left: auto; }

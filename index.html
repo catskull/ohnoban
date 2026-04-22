@@ -11,32 +11,139 @@
     <h1 id="board-title"></h1>
   </header>
   <main id="board"></main>
+
+  <dialog id="card-dialog">
+    <form method="dialog">
+      <label>Title<input name="title" required></label>
+      <label>Description<textarea name="description" rows="3"></textarea></label>
+      <fieldset id="tag-options"><legend>Tags</legend></fieldset>
+      <div class="dialog-actions">
+        <button value="save" type="submit">Save</button>
+        <button value="cancel" type="submit" formnovalidate>Cancel</button>
+        <button value="delete" type="submit" formnovalidate class="delete-btn">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
   <script>
     fetch("board.json")
       .then(r => r.json())
       .then(data => {
         document.getElementById("board-title").textContent = data.title;
         const board = document.getElementById("board");
+        const dialog = document.getElementById("card-dialog");
+        const form = dialog.querySelector("form");
+        const tagOptions = document.getElementById("tag-options");
+        let editingCard = null;
+        let targetUl = null;
+
+        // build tag checkboxes
+        for (const [name, color] of Object.entries(data.tags)) {
+          const lbl = document.createElement("label");
+          lbl.className = "tag-option";
+          lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="background:${color}">${name}</span>`;
+          tagOptions.appendChild(lbl);
+        }
+
+        function renderCard(card) {
+          const li = document.createElement("li");
+          li.className = "card";
+          li.draggable = true;
+          fillCard(li, card);
+          return li;
+        }
+
+        function fillCard(li, card) {
+          li.innerHTML = `
+            <strong>${card.title}</strong>
+            ${card.description ? `<p>${card.description}</p>` : ""}
+            ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
+              `<span class="tag" style="background:${data.tags[t]}">${t}</span>`
+            ).join("")}</div>` : ""}
+          `;
+        }
+
+        function readCard(li) {
+          return {
+            title: li.querySelector("strong").textContent,
+            description: li.querySelector("p")?.textContent || "",
+            tags: [...li.querySelectorAll(".tag")].map(t => t.textContent)
+          };
+        }
+
+        // render columns
         for (const col of data.columns) {
           const section = document.createElement("section");
           section.className = "column";
-          section.innerHTML = `
-            <h2>${col.title}<span class="count">${col.cards.length}</span></h2>
-            <ul>
-              ${col.cards.map(card => `
-                <li class="card" draggable="true">
-                  <strong>${card.title}</strong>
-                  ${card.description ? `<p>${card.description}</p>` : ""}
-                  ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
-                    `<span class="tag" style="background:${data.tags[t]}">${t}</span>`
-                  ).join("")}</div>` : ""}
-                </li>
-              `).join("")}
-            </ul>
-          `;
+
+          const header = document.createElement("h2");
+          header.innerHTML = `${col.title}<span class="count">${col.cards.length}</span>`;
+
+          const addLink = document.createElement("a");
+          addLink.className = "add-card";
+          addLink.textContent = "+ Add card";
+          addLink.href = "#";
+
+          const ul = document.createElement("ul");
+          for (const card of col.cards) ul.appendChild(renderCard(card));
+
+          section.append(header, addLink, ul);
           board.appendChild(section);
         }
 
+        // open dialog for new card
+        board.addEventListener("click", e => {
+          const addLink = e.target.closest(".add-card");
+          if (addLink) {
+            e.preventDefault();
+            editingCard = null;
+            targetUl = addLink.closest(".column").querySelector("ul");
+            form.reset();
+            dialog.querySelector(".delete-btn").hidden = true;
+            dialog.showModal();
+            return;
+          }
+
+          const card = e.target.closest(".card");
+          if (card) {
+            editingCard = card;
+            targetUl = null;
+            const cardData = readCard(card);
+            form.title.value = cardData.title;
+            form.description.value = cardData.description;
+            form.querySelectorAll('input[name="tags"]').forEach(cb => {
+              cb.checked = cardData.tags.includes(cb.value);
+            });
+            dialog.querySelector(".delete-btn").hidden = false;
+            dialog.showModal();
+          }
+        });
+
+        // handle dialog close
+        dialog.addEventListener("close", () => {
+          if (dialog.returnValue === "save") {
+            const cardData = {
+              title: form.title.value.trim(),
+              description: form.description.value.trim(),
+              tags: [...form.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value)
+            };
+            if (!cardData.title) return;
+
+            if (editingCard) {
+              fillCard(editingCard, cardData);
+            } else {
+              targetUl.appendChild(renderCard(cardData));
+            }
+            updateCounts();
+          } else if (dialog.returnValue === "delete" && editingCard) {
+            editingCard.remove();
+            updateCounts();
+          }
+          editingCard = null;
+          targetUl = null;
+        });
+
+        // --- drag and drop ---
         let dragged = null;
         let overCol = null;
         let lastY = 0;
