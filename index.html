@@ -9,6 +9,7 @@
 <body>
   <header>
     <h1 id="board-title"></h1>
+    <button id="settings-btn" type="button" title="Board settings">&#9881;</button>
   </header>
   <main id="board"></main>
 
@@ -28,6 +29,21 @@
         <button value="save" type="submit">Save</button>
         <button value="cancel" type="submit" formnovalidate>Cancel</button>
         <button value="delete" type="submit" formnovalidate class="delete-btn">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <form method="dialog">
+      <h3>Board Settings</h3>
+      <fieldset id="tag-manager">
+        <legend>Tags</legend>
+        <div id="tag-list"></div>
+        <button type="button" id="add-tag-btn">+ Add tag</button>
+      </fieldset>
+      <div class="settings-actions">
+        <button value="save" type="submit">Save</button>
+        <button value="cancel" type="submit" formnovalidate>Cancel</button>
       </div>
     </form>
   </dialog>
@@ -58,13 +74,84 @@
           dialog.querySelector(".delete-btn").hidden = !editingCard;
         }
 
-        // build tag checkboxes
-        for (const [name, color] of Object.entries(data.tags)) {
-          const lbl = document.createElement("label");
-          lbl.className = "tag-option";
-          lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="background:${color}">${name}</span>`;
-          tagOptions.appendChild(lbl);
+        // --- tag management ---
+        const settingsDialog = document.getElementById("settings-dialog");
+        const settingsForm = settingsDialog.querySelector("form");
+        const tagList = document.getElementById("tag-list");
+
+        function rebuildTagCheckboxes() {
+          tagOptions.innerHTML = "<legend>Tags</legend>";
+          for (const [name, color] of Object.entries(data.tags)) {
+            const lbl = document.createElement("label");
+            lbl.className = "tag-option";
+            lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="--tag-bg:${color}">${name}</span>`;
+            tagOptions.appendChild(lbl);
+          }
         }
+        rebuildTagCheckboxes();
+
+        function createTagRow(name, color) {
+          const row = document.createElement("div");
+          row.className = "tag-row";
+          row.dataset.originalName = name;
+          row.innerHTML = `<input type="color" value="${color}" class="tag-color"><input type="text" value="${esc(name)}" class="tag-name" required><button type="button" class="tag-delete-btn" title="Delete tag">&times;</button>`;
+          row.querySelector(".tag-delete-btn").addEventListener("click", () => row.remove());
+          return row;
+        }
+
+        function populateTagManager() {
+          tagList.innerHTML = "";
+          for (const [name, color] of Object.entries(data.tags)) {
+            tagList.appendChild(createTagRow(name, color));
+          }
+        }
+
+        function refreshAllCards(renames, deletions) {
+          document.querySelectorAll(".card").forEach(li => {
+            const cardData = readCard(li);
+            cardData.tags = cardData.tags.map(t => renames[t] || t).filter(t => !deletions.has(t));
+            fillCard(li, cardData);
+          });
+        }
+
+        document.getElementById("settings-btn").addEventListener("click", () => {
+          populateTagManager();
+          settingsDialog.showModal();
+        });
+
+        document.getElementById("add-tag-btn").addEventListener("click", () => {
+          tagList.appendChild(createTagRow("", "#888888"));
+          tagList.lastElementChild.querySelector(".tag-name").focus();
+        });
+
+        let settingsMouseDown = null;
+        settingsDialog.addEventListener("mousedown", e => settingsMouseDown = e.target);
+        settingsDialog.addEventListener("click", e => {
+          if (e.target === settingsDialog && settingsMouseDown === settingsDialog) settingsDialog.close("cancel");
+        });
+
+        settingsDialog.addEventListener("close", () => {
+          if (settingsDialog.returnValue !== "save") return;
+          const renames = {};
+          const deletions = new Set(Object.keys(data.tags));
+          const newTags = {};
+
+          tagList.querySelectorAll(".tag-row").forEach(row => {
+            const name = row.querySelector(".tag-name").value.trim();
+            const color = row.querySelector(".tag-color").value;
+            if (!name) return;
+            const original = row.dataset.originalName;
+            newTags[name] = color;
+            if (original) {
+              deletions.delete(original);
+              if (original !== name) renames[original] = name;
+            }
+          });
+
+          data.tags = newTags;
+          refreshAllCards(renames, deletions);
+          rebuildTagCheckboxes();
+        });
 
         function renderCard(card) {
           const li = document.createElement("li");
@@ -84,7 +171,7 @@
             <strong>${esc(card.title)}</strong>
             ${card.description ? `<div class="desc">${marked.parse(card.description)}</div>` : ""}
             ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
-              `<span class="tag" style="background:${data.tags[t]}">${esc(t)}</span>`
+              `<span class="tag" style="--tag-bg:${data.tags[t]}">${esc(t)}</span>`
             ).join("")}</div>` : ""}
           `;
         }
