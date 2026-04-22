@@ -36,6 +36,7 @@
   <dialog id="settings-dialog">
     <form method="dialog">
       <h3>Board Settings</h3>
+      <label>Board Name<input name="board-name" id="board-name-input" required></label>
       <fieldset id="tag-manager">
         <legend>Tags</legend>
         <div id="tag-list"></div>
@@ -114,7 +115,10 @@
           });
         }
 
+        const boardNameInput = document.getElementById("board-name-input");
+
         document.getElementById("settings-btn").addEventListener("click", () => {
+          boardNameInput.value = data.title;
           populateTagManager();
           settingsDialog.showModal();
         });
@@ -132,6 +136,13 @@
 
         settingsDialog.addEventListener("close", () => {
           if (settingsDialog.returnValue !== "save") return;
+
+          const newName = boardNameInput.value.trim();
+          if (newName) {
+            data.title = newName;
+            document.getElementById("board-title").textContent = newName;
+          }
+
           const renames = {};
           const deletions = new Set(Object.keys(data.tags));
           const newTags = {};

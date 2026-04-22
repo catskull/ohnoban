@@ -56,6 +56,7 @@ dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
 .delete-btn { background: #c23030 !important; border-color: #c23030 !important; color: #fff !important; margin-left: auto; }
 
 #settings-dialog h3 { font-size: 1rem; }
+#board-name-input { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; }
 #settings-dialog form > * + * { margin-top: .75rem; }
 #tag-manager { border: none; padding: 0; min-inline-size: 0; }
 #tag-manager > legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
