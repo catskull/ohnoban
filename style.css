@@ -18,18 +18,20 @@ ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
 
 dialog { border: 3px solid #000; padding: 0; width: 360px; max-width: 90vw; margin: 10vh auto; }
 dialog::backdrop { background: rgba(0,0,0,.4); }
-dialog form { display: flex; flex-direction: column; gap: .75rem; padding: 1.25rem; }
+dialog form { display: block; padding: 1.25rem; }
+dialog form > * + * { margin-top: .75rem; }
 dialog label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; font-weight: 600; }
-dialog input[name="title"], dialog textarea { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; outline: none; }
-dialog input[name="title"]:focus, dialog textarea:focus { border-color: #0b6ff3; }
+dialog input[name="title"], dialog textarea { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; }
 dialog fieldset { border: none; padding: 0; min-inline-size: 0; }
 dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
-.tag-option { flex-direction: row; align-items: center; gap: .4rem; font-weight: normal; cursor: pointer; }
-#tag-options { display: flex; flex-wrap: wrap; gap: .5rem; }
-.view-actions, .edit-actions { gap: .5rem; padding-top: .25rem; }
-.view-actions:not([hidden]), .edit-actions:not([hidden]) { display: flex; }
-.view-actions button, .edit-actions button { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; }
-.view-actions button[value="cancel"], .edit-actions button[value="cancel"] { background: #fff; color: #000; }
+.tag-option { display: inline-flex; flex-direction: row; align-items: center; gap: .4rem; font-weight: normal; cursor: pointer; margin: .2rem .15rem; }
+#tag-options { display: block; }
+:is(.view-actions, .edit-actions) { padding-top: .25rem; }
+:is(.view-actions, .edit-actions):not([hidden]) { display: flex; }
+:is(.view-actions, .edit-actions) button + button { margin-left: .5rem; }
+:is(.view-actions, .edit-actions) button { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; outline: none; }
+:is(.view-actions, .edit-actions) button:focus-visible { box-shadow: inset 0 0 0 2px #0b6ff3; }
+:is(.view-actions, .edit-actions) button[value="cancel"] { background: #fff; color: #000; }
 .delete-btn { background: #c23030 !important; border-color: #c23030 !important; color: #fff !important; margin-left: auto; }
 dialog input:disabled, dialog textarea:disabled { background: #fff; color: #000; border-color: transparent; }
 dialog input[type="checkbox"]:disabled { accent-color: unset; }
