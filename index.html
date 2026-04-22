@@ -24,7 +24,7 @@
             <h2>${col.title}<span class="count">${col.cards.length}</span></h2>
             <ul>
               ${col.cards.map(card => `
-                <li class="card">
+                <li class="card" draggable="true">
                   <strong>${card.title}</strong>
                   ${card.description ? `<p>${card.description}</p>` : ""}
                   ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
@@ -35,6 +35,72 @@
             </ul>
           `;
           board.appendChild(section);
+        }
+
+        let dragged = null;
+        let overCol = null;
+        let lastY = 0;
+
+        function clearDragOver() {
+          if (overCol) { overCol.classList.remove("drag-over"); overCol = null; }
+        }
+
+        board.addEventListener("dragstart", e => {
+          const card = e.target.closest(".card");
+          if (!card) return;
+          dragged = card;
+          card.classList.add("dragging");
+        });
+
+        board.addEventListener("dragend", () => {
+          if (dragged) dragged.classList.remove("dragging");
+          clearDragOver();
+          dragged = null;
+          lastY = 0;
+        });
+
+        board.addEventListener("dragover", e => {
+          e.preventDefault();
+          const col = e.target.closest(".column");
+          if (!col) return;
+
+          if (col !== overCol) {
+            clearDragOver();
+            overCol = col;
+            col.classList.add("drag-over");
+          }
+
+          if (Math.abs(e.clientY - lastY) < 5) return;
+          lastY = e.clientY;
+
+          const ul = col.querySelector("ul");
+          const afterCard = getDragAfterCard(ul, e.clientY);
+          if (afterCard) {
+            ul.insertBefore(dragged, afterCard);
+          } else {
+            ul.appendChild(dragged);
+          }
+        });
+
+        board.addEventListener("drop", e => {
+          e.preventDefault();
+          clearDragOver();
+          updateCounts();
+        });
+
+        function getDragAfterCard(ul, y) {
+          const cards = [...ul.querySelectorAll(".card:not(.dragging)")];
+          for (const card of cards) {
+            const box = card.getBoundingClientRect();
+            if (y < box.top + box.height / 2) return card;
+          }
+          return null;
+        }
+
+        function updateCounts() {
+          document.querySelectorAll(".column").forEach(col => {
+            col.querySelector(".count").textContent = col.querySelectorAll(".card").length;
+          });
         }
       });
   </script>
