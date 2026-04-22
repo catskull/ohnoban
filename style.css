@@ -22,6 +22,7 @@ dialog form { display: block; padding: 1.25rem; }
 dialog form > * + * { margin-top: .75rem; }
 dialog label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; font-weight: 600; }
 dialog input[name="title"], dialog textarea { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; }
+dialog textarea { resize: vertical; }
 dialog fieldset { border: none; padding: 0; min-inline-size: 0; }
 dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
 .tag-option { display: inline-flex; flex-direction: row; align-items: center; gap: .4rem; font-weight: normal; cursor: pointer; margin: .2rem .15rem; }

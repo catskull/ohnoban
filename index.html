@@ -139,8 +139,10 @@
 
         dialog.querySelector(".edit-btn").addEventListener("click", () => setMode("edit"));
 
+        let mouseDownTarget = null;
+        dialog.addEventListener("mousedown", e => mouseDownTarget = e.target);
         dialog.addEventListener("click", e => {
-          if (e.target === dialog) dialog.close("cancel");
+          if (e.target === dialog && mouseDownTarget === dialog) dialog.close("cancel");
         });
 
         // handle dialog close
@@ -165,6 +167,7 @@
           }
           editingCard = null;
           targetUl = null;
+          form.description.style.height = "";
         });
 
         // --- drag and drop ---
