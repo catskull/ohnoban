@@ -32,7 +32,9 @@
     </form>
   </dialog>
 
+  <script src="marked.min.js"></script>
   <script>
+    marked.setOptions({ breaks: true, gfm: true });
     fetch("board.json")
       .then(r => r.json())
       .then(data => {
@@ -77,9 +79,10 @@
         }
 
         function fillCard(el, card) {
+          el.dataset.description = card.description || "";
           el.innerHTML = `
             <strong>${esc(card.title)}</strong>
-            ${card.description ? `<p>${esc(card.description)}</p>` : ""}
+            ${card.description ? `<div class="desc">${marked.parse(card.description)}</div>` : ""}
             ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
               `<span class="tag" style="background:${data.tags[t]}">${esc(t)}</span>`
             ).join("")}</div>` : ""}
@@ -89,7 +92,7 @@
         function readCard(li) {
           return {
             title: li.querySelector("strong").textContent,
-            description: li.querySelector("p")?.textContent || "",
+            description: li.dataset.description || "",
             tags: [...li.querySelectorAll(".tag")].map(t => t.textContent)
           };
         }

@@ -15,7 +15,7 @@
       "id": "backlog",
       "title": "Backlog",
       "cards": [
-        { "id": "1", "title": "Research storage options", "description": "Look into localStorage vs IndexedDB", "tags": ["research"] },
+        { "id": "1", "title": "Research storage options", "description": "Look into **localStorage** vs `IndexedDB`\n\n- Size limits\n- API complexity\n- [MDN docs](https://developer.mozilla.org)", "tags": ["research"] },
         { "id": "2", "title": "Design card layout", "tags": ["design", "low"] }
       ]
     },
