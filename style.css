@@ -73,10 +73,13 @@ dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
 .tag-row .tag-delete-btn:hover { background: #c23030; color: #fff; }
 #add-tag-btn { font: inherit; font-size: .8rem; background: #fff; border: 2px dashed #999; border-radius: .25rem; padding: .3rem .6rem; cursor: pointer; color: #666; }
 #add-tag-btn:hover { border-color: #000; color: #000; }
-.io-actions { border: none; padding: 0; min-inline-size: 0; }
-.io-actions legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
-.io-actions button { font: inherit; font-size: .8rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #fff; color: #000; margin-right: .5rem; }
-.io-actions button:hover { background: #000; color: #fff; }
+.io-actions, .auth-actions { border: none; padding: 0; min-inline-size: 0; }
+.io-actions legend, .auth-actions legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
+.io-actions button, .auth-actions button { font: inherit; font-size: .8rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #fff; color: #000; margin-right: .5rem; }
+.io-actions button:hover, .auth-actions button:not(:disabled):hover { background: #000; color: #fff; }
+.auth-actions button:disabled { opacity: .4; cursor: not-allowed; }
+#auth-status { font-size: .8rem; color: #666; margin-bottom: .5rem; }
+#auth-output { font-family: ui-monospace, monospace; font-size: .7rem; background: #f0f0f0; padding: .5rem; border-radius: .25rem; margin-top: .5rem; white-space: pre-wrap; word-break: break-all; }
 .settings-actions { display: flex; padding-top: .25rem; }
 .settings-actions button + button { margin-left: .5rem; }
 .settings-actions button { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; }
