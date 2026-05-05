@@ -35,6 +35,7 @@ ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
 
 header { display: flex; align-items: center; padding: .75rem 1rem; padding-right: 9rem; }
 header h1 { flex: 1; }
+body.bg-dark #board-title { color: #fff; }
 .header-actions { position: fixed; top: 0; right: 1rem; padding: .75rem 0; display: flex; align-items: center; gap: .5rem; z-index: 10; }
 #add-column-btn, #settings-btn { font: inherit; font-size: .85rem; background: #fff; border: 2px solid #000; border-radius: .25rem; cursor: pointer; padding: .25rem .5rem; }
 #add-column-btn:hover, #settings-btn:hover { background: #000; color: #fff; }
@@ -68,8 +69,6 @@ dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
 #settings-dialog h3 { font-size: 1rem; }
 #board-name-input { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; }
 #settings-dialog form > * + * { margin-top: .75rem; }
-#tag-manager { border: none; padding: 0; min-inline-size: 0; }
-#tag-manager > legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
 .tag-row { display: flex; align-items: center; margin-bottom: .5rem; }
 .tag-row .tag-color { width: 2rem; height: 2rem; padding: 0; border: 2px solid #000; border-radius: .25rem; cursor: pointer; }
 .tag-row .tag-name { flex: 1; font: inherit; padding: .3rem .4rem; border: 2px solid #000; border-radius: .25rem; margin: 0 .5rem; }
@@ -77,10 +76,17 @@ dialog legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
 .tag-row .tag-delete-btn:hover { background: #c23030; color: #fff; }
 #add-tag-btn { font: inherit; font-size: .8rem; background: #fff; border: 2px dashed #999; border-radius: .25rem; padding: .3rem .6rem; cursor: pointer; color: #666; }
 #add-tag-btn:hover { border-color: #000; color: #000; }
-.io-actions { border: none; padding: 0; min-inline-size: 0; }
-.io-actions legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
-.io-actions button { font: inherit; font-size: .8rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #fff; color: #000; margin-right: .5rem; }
-.io-actions button:hover { background: #000; color: #fff; }
+#tag-manager, .io-actions, .bg-actions { border: none; padding: 0; min-inline-size: 0; }
+#tag-manager > legend, .io-actions legend, .bg-actions legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
+.io-actions button, .bg-actions button { font: inherit; font-size: .8rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #fff; color: #000; margin-right: .5rem; }
+.io-actions button:hover, .bg-actions button:hover { background: #000; color: #fff; }
+.bg-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+.bg-row + .bg-row { margin-top: .25rem; }
+#bg-preview { width: 60px; height: 40px; object-fit: cover; border: 2px solid #000; border-radius: .25rem; }
+#bg-empty { font-size: .8rem; color: #666; flex: 1; }
+#bg-mode { font: inherit; font-size: .8rem; padding: .3rem .4rem; border: 2px solid #000; border-radius: .25rem; }
+#bg-remove-btn { border-color: #c23030; color: #c23030; }
+#bg-remove-btn:hover { background: #c23030; color: #fff; }
 .settings-actions { display: flex; padding-top: .25rem; }
 .settings-actions button + button { margin-left: .5rem; }
 .settings-actions button { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; }

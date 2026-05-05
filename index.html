@@ -45,6 +45,23 @@
         <div id="tag-list"></div>
         <button type="button" id="add-tag-btn">+ Add tag</button>
       </fieldset>
+      <fieldset class="bg-actions">
+        <legend>Background</legend>
+        <div class="bg-row">
+          <img id="bg-preview" alt="" hidden>
+          <span id="bg-empty">No background</span>
+          <select id="bg-mode">
+            <option value="tile">Tile</option>
+            <option value="center">Center</option>
+            <option value="stretch">Stretch</option>
+          </select>
+        </div>
+        <div class="bg-row">
+          <button type="button" id="bg-choose-btn">Choose image…</button>
+          <button type="button" id="bg-remove-btn">Remove</button>
+          <input type="file" id="bg-file" accept="image/*" hidden>
+        </div>
+      </fieldset>
       <fieldset class="io-actions">
         <legend>Data</legend>
         <button type="button" id="export-btn">Export JSON</button>
@@ -97,6 +114,19 @@
         return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       }
 
+      function pickFile(btnId, inputId, readMethod, onResult) {
+        const input = document.getElementById(inputId);
+        document.getElementById(btnId).addEventListener("click", () => input.click());
+        input.addEventListener("change", () => {
+          const file = input.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => onResult(reader.result);
+          reader[readMethod](file);
+          input.value = "";
+        });
+      }
+
       function fillCard(el, card) {
         el.dataset.description = card.description || "";
         el.innerHTML = `
@@ -139,12 +169,92 @@
           title: col.querySelector("h2").childNodes[0].textContent,
           cards: [...col.querySelectorAll(".card")].map(li => readCard(li))
         }));
-        return { title: data.title, tags: { ...data.tags }, columns };
+        const out = { title: data.title, tags: { ...data.tags }, columns };
+        if (data.background?.image) out.background = { ...data.background };
+        return out;
       }
 
+      let quotaWarned = false;
       function save() {
-        localStorage.setItem("ohnoban-board", JSON.stringify(serializeBoard()));
+        try {
+          const { background, ...rest } = serializeBoard();
+          localStorage.setItem("ohnoban-board", JSON.stringify(rest));
+          quotaWarned = false;
+        } catch (e) {
+          if (!quotaWarned) {
+            quotaWarned = true;
+            alert("Could not save the board.\n\n" + e.message);
+          }
+        }
       }
+      function saveBackground() {
+        try {
+          if (data.background?.image) localStorage.setItem("ohnoban-bg", JSON.stringify(data.background));
+          else localStorage.removeItem("ohnoban-bg");
+          quotaWarned = false;
+        } catch (e) {
+          quotaWarned = true;
+          alert("Background image is too large for local storage.\n\n" + e.message);
+          data.background = null;
+          localStorage.removeItem("ohnoban-bg");
+          applyBackground();
+        }
+      }
+
+      const BG_MODES = {
+        tile:    { backgroundRepeat: "repeat",    backgroundSize: "auto",  backgroundPosition: "" },
+        center:  { backgroundRepeat: "no-repeat", backgroundSize: "auto",  backgroundPosition: "center center" },
+        stretch: { backgroundRepeat: "no-repeat", backgroundSize: "cover", backgroundPosition: "center" },
+      };
+      const BG_CONTRAST_SAMPLE = 64;
+      const BG_DARK_THRESHOLD = 0.5;
+      let bgContrastToken = 0;
+      let lastContrastImage = null, lastContrastDark = false;
+      function updateBgContrast() {
+        const bg = data.background;
+        if (!bg?.image) {
+          lastContrastImage = null;
+          document.body.classList.remove("bg-dark");
+          return;
+        }
+        if (bg.image === lastContrastImage) {
+          document.body.classList.toggle("bg-dark", lastContrastDark);
+          return;
+        }
+        const token = ++bgContrastToken;
+        const img = new Image();
+        img.onload = () => {
+          if (token !== bgContrastToken) return;
+          const w = Math.min(BG_CONTRAST_SAMPLE, img.naturalWidth) || 1;
+          const h = Math.min(BG_CONTRAST_SAMPLE, img.naturalHeight) || 1;
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          const px = ctx.getImageData(0, 0, w, h).data;
+          const pixelCount = px.length / 4;
+          let sum = 0;
+          for (let i = 0; i < px.length; i += 4) {
+            sum += 0.2126 * px[i] + 0.7152 * px[i+1] + 0.0722 * px[i+2];
+          }
+          const avg = sum / pixelCount / 255;
+          lastContrastImage = bg.image;
+          lastContrastDark = avg < BG_DARK_THRESHOLD;
+          document.body.classList.toggle("bg-dark", lastContrastDark);
+        };
+        img.onerror = () => { if (token === bgContrastToken) lastContrastImage = null; };
+        img.src = bg.image;
+      }
+      function applyBackground() {
+        const bg = data.background;
+        Object.assign(document.body.style, {
+          backgroundImage: bg?.image ? `url("${bg.image}")` : "",
+          backgroundAttachment: "fixed",
+          ...(bg?.image ? (BG_MODES[bg.mode] ?? BG_MODES.tile) : {}),
+        });
+        updateBgContrast();
+      }
+      applyBackground();
 
       // --- board rendering ---
       function renderColumn(col) {
@@ -360,9 +470,39 @@
         });
       }
 
+      // --- background management ---
+      const bgPreview = document.getElementById("bg-preview");
+      const bgEmpty = document.getElementById("bg-empty");
+      const bgMode = document.getElementById("bg-mode");
+      let pendingBg = null;
+
+      function refreshBgPreview() {
+        if (pendingBg?.image) {
+          bgPreview.src = pendingBg.image;
+          bgPreview.hidden = false;
+          bgEmpty.hidden = true;
+        } else {
+          bgPreview.removeAttribute("src");
+          bgPreview.hidden = true;
+          bgEmpty.hidden = false;
+        }
+      }
+
+      pickFile("bg-choose-btn", "bg-file", "readAsDataURL", result => {
+        pendingBg = { image: result };
+        refreshBgPreview();
+      });
+      document.getElementById("bg-remove-btn").addEventListener("click", () => {
+        pendingBg = { image: null };
+        refreshBgPreview();
+      });
+
       document.getElementById("settings-btn").addEventListener("click", () => {
         boardNameInput.value = data.title;
         populateTagManager();
+        pendingBg = { image: data.background?.image ?? null };
+        bgMode.value = data.background?.mode ?? "tile";
+        refreshBgPreview();
         settingsDialog.showModal();
       });
 
@@ -405,7 +545,12 @@
         data.tags = newTags;
         refreshAllCards(renames, deletions);
         rebuildTagCheckboxes();
+
+        data.background = pendingBg?.image ? { image: pendingBg.image, mode: bgMode.value || "tile" } : null;
+        applyBackground();
+
         save();
+        saveBackground();
       });
 
       // --- import/export ---
@@ -418,33 +563,27 @@
         URL.revokeObjectURL(a.href);
       });
 
-      const importFile = document.getElementById("import-file");
-      document.getElementById("import-btn").addEventListener("click", () => importFile.click());
-      importFile.addEventListener("change", () => {
-        const file = importFile.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const imported = JSON.parse(reader.result);
-            if (!imported.title || !imported.columns || !Array.isArray(imported.columns)) {
-              alert("Invalid board file.");
-              return;
-            }
-            data.title = imported.title;
-            data.tags = imported.tags || {};
-            data.columns = imported.columns;
-            document.getElementById("board-title").textContent = data.title;
-            rebuildTagCheckboxes();
-            renderBoard();
-            save();
-            settingsDialog.close("cancel");
-          } catch (e) {
-            alert("Could not parse JSON file.");
+      pickFile("import-btn", "import-file", "readAsText", result => {
+        try {
+          const imported = JSON.parse(result);
+          if (!imported.title || !imported.columns || !Array.isArray(imported.columns)) {
+            alert("Invalid board file.");
+            return;
           }
-        };
-        reader.readAsText(file);
-        importFile.value = "";
+          data.title = imported.title;
+          data.tags = imported.tags || {};
+          data.columns = imported.columns;
+          data.background = imported.background || null;
+          document.getElementById("board-title").textContent = data.title;
+          rebuildTagCheckboxes();
+          renderBoard();
+          applyBackground();
+          save();
+          saveBackground();
+          settingsDialog.close("cancel");
+        } catch (e) {
+          alert("Could not parse JSON file.");
+        }
       });
 
       // --- drag and drop ---
@@ -512,11 +651,19 @@
       }
     }
 
+    function readSavedBackground() {
+      const raw = localStorage.getItem("ohnoban-bg");
+      if (!raw) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+
     // --- load from localStorage or board.json ---
     const saved = localStorage.getItem("ohnoban-board");
     if (saved) {
       try {
-        loadBoard(JSON.parse(saved));
+        const board = JSON.parse(saved);
+        board.background = readSavedBackground();
+        loadBoard(board);
       } catch (e) {
         console.warn("Bad localStorage data, falling back to board.json", e);
         localStorage.removeItem("ohnoban-board");
