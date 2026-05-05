@@ -262,6 +262,30 @@
         openDialog(card, "view");
       });
 
+      document.addEventListener("keydown", e => {
+        if (!e.key.startsWith("Arrow")) return;
+        const tag = e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+        const card = dialog.open ? editingCard : (e.target.classList.contains("card") ? e.target : null);
+        if (!card) return;
+
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          const currentCol = card.closest(".column");
+          const targetCol = e.key === "ArrowLeft" ? currentCol.previousElementSibling : currentCol.nextElementSibling;
+          if (!targetCol?.classList.contains("column")) return;
+          e.preventDefault();
+          targetCol.querySelector("ul").appendChild(card);
+          updateCounts();
+        } else {
+          const sibling = e.key === "ArrowUp" ? card.previousElementSibling : card.nextElementSibling;
+          if (!sibling?.classList.contains("card")) return;
+          e.preventDefault();
+          e.key === "ArrowUp" ? sibling.before(card) : sibling.after(card);
+        }
+        save();
+        if (!dialog.open) card.focus();
+      });
+
       dialog.querySelector(".edit-btn").addEventListener("click", () => setMode("edit"));
 
       let mouseDownTarget = null;
