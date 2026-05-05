@@ -461,10 +461,12 @@
         if (!card) return;
         dragged = card;
         card.classList.add("dragging");
+        board.classList.add("dragging");
       });
 
       board.addEventListener("dragend", () => {
         if (dragged) dragged.classList.remove("dragging");
+        board.classList.remove("dragging");
         clearDragOver();
         dragged = null;
         lastY = 0;
