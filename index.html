@@ -9,10 +9,12 @@
 <body>
   <header>
     <h1 id="board-title"></h1>
-    <button id="add-column-btn" type="button" title="Add column">+ Column</button>
-    <button id="settings-btn" type="button" title="Board settings">&#9881;</button>
   </header>
   <main id="board"></main>
+  <div class="header-actions">
+    <button id="add-column-btn" type="button" title="Add column">+ Column</button>
+    <button id="settings-btn" type="button" title="Board settings">&#9881;</button>
+  </div>
 
   <dialog id="card-dialog">
     <div class="card-view"></div>
@@ -60,6 +62,22 @@
   <script>
     marked.setOptions({ breaks: true, gfm: true });
 
+    const TABBABLE = "button, a[href], input:not([type=hidden]), select, textarea";
+    function ensureTabbable(root) {
+      if (root.matches?.(TABBABLE) && !root.hasAttribute("tabindex")) root.tabIndex = 0;
+      root.querySelectorAll?.(TABBABLE).forEach(el => {
+        if (!el.hasAttribute("tabindex")) el.tabIndex = 0;
+      });
+    }
+    new MutationObserver(mutations => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node.nodeType === 1) ensureTabbable(node);
+        }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+    ensureTabbable(document.body);
+
     function loadBoard(data) {
       if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
@@ -102,6 +120,8 @@
         const li = document.createElement("li");
         li.className = "card";
         li.draggable = true;
+        li.tabIndex = 0;
+        li.setAttribute("role", "button");
         fillCard(li, card);
         return li;
       }
@@ -137,7 +157,7 @@
 
         const colActions = document.createElement("span");
         colActions.className = "col-actions";
-        colActions.innerHTML = `<button class="col-move-btn" data-dir="left" title="Move left">\u2039</button><button class="col-move-btn" data-dir="right" title="Move right">\u203a</button><button class="col-delete-btn" title="Delete column">\u00d7</button>`;
+        colActions.innerHTML = `<button class="col-move-btn" data-dir="left" title="Move left" tabindex="-1">\u2039</button><button class="col-move-btn" data-dir="right" title="Move right" tabindex="-1">\u203a</button><button class="col-delete-btn" title="Delete column" tabindex="-1">\u00d7</button>`;
         colActions.querySelector(".col-delete-btn").addEventListener("click", () => {
           const cards = section.querySelectorAll(".card").length;
           if (cards > 0 && !confirm(`Delete "${col.title}" and its ${cards} card${cards > 1 ? "s" : ""}?`)) return;
@@ -231,6 +251,15 @@
           targetUl = null;
           openDialog(card, "view");
         }
+      });
+
+      board.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const card = e.target.closest(".card");
+        if (!card || card !== e.target) return;
+        e.preventDefault();
+        targetUl = null;
+        openDialog(card, "view");
       });
 
       dialog.querySelector(".edit-btn").addEventListener("click", () => setMode("edit"));
