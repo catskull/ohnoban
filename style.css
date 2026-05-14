@@ -10,7 +10,12 @@ body { font-family: system-ui, sans-serif; }
 .col-move-btn:hover { color: #000; }
 .col-delete-btn:hover { color: #c23030; }
 ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
-.card { border: 3px solid #000; padding: .75rem; background: #fff; cursor: grab; }
+.card { border: 3px solid #000; padding: .75rem; background: #fff; cursor: grab; overflow: hidden; }
+.card * { pointer-events: none; }
+.card a[href] { pointer-events: auto; }
+:is(.card, .card-view) :is(img, video, iframe, embed, object, canvas, svg) { max-width: 100%; height: auto; }
+:is(.card, .card-view) * { max-width: 100%; }
+:is(.card, .card-view) .desc { overflow-wrap: break-word; word-break: break-word; }
 .card:focus { outline: none; }
 .card:focus-visible { outline: auto; outline-offset: 2px; }
 .card.dragging { opacity: .3; }
