@@ -3,12 +3,12 @@ body { font-family: system-ui, sans-serif; }
 #board { display: flex; gap: 1rem; padding: 1rem; overflow-x: auto; align-items: start; }
 #board.dragging { align-items: stretch; }
 .column { background: #f0f0f0; border-radius: .5rem; width: 280px; flex-shrink: 0; padding: .75rem; }
-.column h2 { font-size: .85rem; text-transform: uppercase; color: #666; padding: 0 .25rem .5rem; display: flex; align-items: center; }
-.col-title { cursor: text; padding: 0 .15rem; border-radius: .15rem; }
+.column h2 { font-size: .85rem; text-transform: uppercase; color: #666; padding: 0 .25rem .5rem; display: flex; align-items: flex-start; }
+.col-title { cursor: text; padding: 0 .15rem; border-radius: .15rem; min-width: 0; overflow-wrap: break-word; }
 .col-title:hover { background: rgba(0,0,0,.05); }
 .col-title[contenteditable="true"] { background: #fff; outline: 2px solid #000; cursor: text; }
-.count { background: #000; color: #fff; font-size: .7rem; font-weight: 600; padding: .1rem .45rem; border-radius: 999px; margin-left: .35rem; }
-.col-actions { margin-left: auto; display: flex; gap: .15rem; }
+.count { background: #000; color: #fff; font-size: .7rem; font-weight: 600; padding: .1rem .45rem; border-radius: 999px; margin-left: .35rem; flex-shrink: 0; }
+.col-actions { margin-left: auto; display: flex; gap: .15rem; flex-shrink: 0; }
 .col-move-btn, .col-delete-btn { background: none; border: none; color: #999; font-size: 1rem; cursor: pointer; padding: 0 .2rem; line-height: 1; }
 .col-move-btn:hover { color: #000; }
 .col-delete-btn:hover { color: #c23030; }
