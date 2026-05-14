@@ -114,15 +114,13 @@
         return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       }
 
-      function pickFile(btnId, inputId, readMethod, onResult) {
+      function pickFile(btnId, inputId, onFile) {
         const input = document.getElementById(inputId);
         document.getElementById(btnId).addEventListener("click", () => input.click());
         input.addEventListener("change", () => {
           const file = input.files[0];
           if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => onResult(reader.result);
-          reader[readMethod](file);
+          onFile(file);
           input.value = "";
         });
       }
@@ -298,7 +296,15 @@
           const onPaste = (e) => {
             e.preventDefault();
             const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s+/g, " ");
-            document.execCommand("insertText", false, text);
+            const sel = window.getSelection();
+            const range = sel.getRangeAt(0);
+            range.deleteContents();
+            const node = document.createTextNode(text);
+            range.insertNode(node);
+            range.setStartAfter(node);
+            range.setEndAfter(node);
+            sel.removeAllRanges();
+            sel.addRange(range);
           };
           titleEl.addEventListener("keydown", onKey);
           titleEl.addEventListener("blur", onBlur);
@@ -317,13 +323,10 @@
         colActions.addEventListener("click", e => {
           const btn = e.target.closest(".col-move-btn");
           if (!btn) return;
-          const sibling = btn.dataset.dir === "left" ? section.previousElementSibling : section.nextElementSibling;
-          if (!sibling || !sibling.classList.contains("column")) return;
-          if (btn.dataset.dir === "left") {
-            board.insertBefore(section, sibling);
-          } else {
-            board.insertBefore(sibling, section);
-          }
+          const dir = btn.dataset.dir;
+          const sibling = dir === "left" ? section.previousElementSibling : section.nextElementSibling;
+          if (!sibling?.classList.contains("column")) return;
+          dir === "left" ? sibling.before(section) : sibling.after(section);
           save();
         });
         header.appendChild(colActions);
@@ -334,17 +337,14 @@
         addLink.href = "#";
 
         const ul = document.createElement("ul");
-        for (const card of col.cards) ul.appendChild(renderCard(card));
+        ul.append(...col.cards.map(renderCard));
 
         section.append(header, addLink, ul);
         return section;
       }
 
       function renderBoard() {
-        board.innerHTML = "";
-        for (const col of data.columns) {
-          board.appendChild(renderColumn(col));
-        }
+        board.replaceChildren(...data.columns.map(renderColumn));
       }
 
       document.getElementById("add-column-btn").addEventListener("click", () => {
@@ -478,13 +478,14 @@
       const boardNameInput = document.getElementById("board-name-input");
 
       function rebuildTagCheckboxes() {
-        tagOptions.innerHTML = "<legend>Tags</legend>";
-        for (const [name, color] of Object.entries(data.tags)) {
+        const legend = tagOptions.querySelector("legend");
+        const labels = Object.entries(data.tags).map(([name, color]) => {
           const lbl = document.createElement("label");
           lbl.className = "tag-option";
           lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="--tag-bg:${color}">${name}</span>`;
-          tagOptions.appendChild(lbl);
-        }
+          return lbl;
+        });
+        tagOptions.replaceChildren(legend, ...labels);
       }
       rebuildTagCheckboxes();
 
@@ -498,10 +499,7 @@
       }
 
       function populateTagManager() {
-        tagList.innerHTML = "";
-        for (const [name, color] of Object.entries(data.tags)) {
-          tagList.appendChild(createTagRow(name, color));
-        }
+        tagList.replaceChildren(...Object.entries(data.tags).map(e => createTagRow(...e)));
       }
 
       function refreshAllCards(renames, deletions) {
@@ -532,9 +530,13 @@
         bgRemoveBtn.hidden = !hasImage;
       }
 
-      pickFile("bg-choose-btn", "bg-file", "readAsDataURL", result => {
-        pendingBg = { image: result };
-        refreshBgPreview();
+      pickFile("bg-choose-btn", "bg-file", file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          pendingBg = { image: reader.result };
+          refreshBgPreview();
+        };
+        reader.readAsDataURL(file);
       });
       document.getElementById("bg-remove-btn").addEventListener("click", () => {
         pendingBg = { image: null };
@@ -607,9 +609,9 @@
         URL.revokeObjectURL(a.href);
       });
 
-      pickFile("import-btn", "import-file", "readAsText", result => {
+      pickFile("import-btn", "import-file", async file => {
         try {
-          const imported = JSON.parse(result);
+          const imported = JSON.parse(await file.text());
           if (!imported.title || !imported.columns || !Array.isArray(imported.columns)) {
             alert("Invalid board file.");
             return;
