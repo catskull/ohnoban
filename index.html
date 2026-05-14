@@ -166,7 +166,7 @@
       function serializeBoard() {
         const columns = [...document.querySelectorAll(".column")].map(col => ({
           id: col.dataset.columnId,
-          title: col.querySelector("h2").childNodes[0].textContent,
+          title: col.querySelector(".col-title").textContent,
           cards: [...col.querySelectorAll(".card")].map(li => readCard(li))
         }));
         const out = { title: data.title, tags: { ...data.tags }, columns };
@@ -263,14 +263,54 @@
         section.dataset.columnId = col.id;
 
         const header = document.createElement("h2");
-        header.innerHTML = `${esc(col.title)}<span class="count">${col.cards.length}</span>`;
+        header.innerHTML = `<span class="col-title" title="Click to rename">${esc(col.title)}</span><span class="count">${col.cards.length}</span>`;
+
+        const titleEl = header.querySelector(".col-title");
+        titleEl.addEventListener("click", () => {
+          if (titleEl.isContentEditable) return;
+          const original = titleEl.textContent;
+          titleEl.contentEditable = "true";
+          titleEl.focus();
+          const range = document.createRange();
+          range.selectNodeContents(titleEl);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+
+          const finish = (commit) => {
+            titleEl.removeEventListener("keydown", onKey);
+            titleEl.removeEventListener("blur", onBlur);
+            titleEl.removeEventListener("paste", onPaste);
+            titleEl.removeAttribute("contenteditable");
+            const next = titleEl.textContent.trim();
+            if (commit && next && next !== original) {
+              titleEl.textContent = next;
+              save();
+            } else {
+              titleEl.textContent = original;
+            }
+          };
+          const onKey = (e) => {
+            if (e.key === "Enter") { e.preventDefault(); finish(true); }
+            else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+          };
+          const onBlur = () => finish(true);
+          const onPaste = (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s+/g, " ");
+            document.execCommand("insertText", false, text);
+          };
+          titleEl.addEventListener("keydown", onKey);
+          titleEl.addEventListener("blur", onBlur);
+          titleEl.addEventListener("paste", onPaste);
+        });
 
         const colActions = document.createElement("span");
         colActions.className = "col-actions";
         colActions.innerHTML = `<button class="col-move-btn" data-dir="left" title="Move left" tabindex="-1">\u2039</button><button class="col-move-btn" data-dir="right" title="Move right" tabindex="-1">\u203a</button><button class="col-delete-btn" title="Delete column" tabindex="-1">\u00d7</button>`;
         colActions.querySelector(".col-delete-btn").addEventListener("click", () => {
           const cards = section.querySelectorAll(".card").length;
-          if (cards > 0 && !confirm(`Delete "${col.title}" and its ${cards} card${cards > 1 ? "s" : ""}?`)) return;
+          if (cards > 0 && !confirm(`Delete "${titleEl.textContent}" and its ${cards} card${cards > 1 ? "s" : ""}?`)) return;
           section.remove();
           save();
         });
