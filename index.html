@@ -476,18 +476,20 @@
       const bgPreview = document.getElementById("bg-preview");
       const bgEmpty = document.getElementById("bg-empty");
       const bgMode = document.getElementById("bg-mode");
+      const bgRemoveBtn = document.getElementById("bg-remove-btn");
       let pendingBg = null;
 
       function refreshBgPreview() {
-        if (pendingBg?.image) {
+        const hasImage = !!pendingBg?.image;
+        if (hasImage) {
           bgPreview.src = pendingBg.image;
-          bgPreview.hidden = false;
-          bgEmpty.hidden = true;
         } else {
           bgPreview.removeAttribute("src");
-          bgPreview.hidden = true;
-          bgEmpty.hidden = false;
         }
+        bgPreview.hidden = !hasImage;
+        bgEmpty.hidden = hasImage;
+        bgMode.hidden = !hasImage;
+        bgRemoveBtn.hidden = !hasImage;
       }
 
       pickFile("bg-choose-btn", "bg-file", "readAsDataURL", result => {
