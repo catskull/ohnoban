@@ -57,6 +57,11 @@
           "title": "Read this card ✅",
           "description": "Nice. Finished work lives here.\n\nWhen you're ready to start fresh, delete each intro card with the red **Delete** button in its edit view, or clear everything by running `localStorage.clear()` in the browser console.",
           "tags": ["intro"]
+        },
+        {
+          "title": "Open source on GitHub",
+          "description": "ohnoban lives at [github.com/catskull/ohnoban](https://github.com/catskull/ohnoban) — star it, fork it, or file an issue.",
+          "tags": ["intro"]
         }
       ]
     }
