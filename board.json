@@ -1,35 +1,64 @@
 {
-  "title": "My Board",
+  "title": "Welcome to ohnoban",
   "tags": {
-    "bug":      "#c23030",
-    "feature":  "#2b4f8e",
-    "design":   "#6b4c8a",
-    "research": "#2a9d8f",
-    "urgent":   "#b85535",
-    "blocked":  "#d4a030",
-    "low":      "#8a9a5b",
-    "review":   "#9b3060"
+    "intro":    "#2b4f8e",
+    "tip":      "#2a9d8f",
+    "shortcut": "#6b4c8a",
+    "feature":  "#8a9a5b"
   },
   "columns": [
     {
-      "id": "backlog",
-      "title": "Backlog",
+      "id": "start-here",
+      "title": "Start here",
       "cards": [
-        { "id": "1", "title": "Research storage options", "description": "Look into **localStorage** vs `IndexedDB`\n\n- Size limits\n- API complexity\n- [MDN docs](https://developer.mozilla.org)", "tags": ["research"] },
-        { "id": "2", "title": "Design card layout", "tags": ["design", "low"] }
+        {
+          "title": "Welcome 👋",
+          "description": "**ohnoban** is a personal kanban board that runs entirely in your browser.\n\nNo accounts, no servers — your board is saved in `localStorage` and survives reloads. Export to JSON anytime from the settings menu.\n\nDelete these intro cards when you're ready to make the board your own.",
+          "tags": ["intro"]
+        },
+        {
+          "title": "Drag, drop, reorder",
+          "description": "Drag any card to move it between columns or reorder within one. Drop targets stretch to the full column height while dragging so you can't miss.\n\nColumns themselves can be reordered with the **‹** and **›** buttons in their header.",
+          "tags": ["feature"]
+        },
+        {
+          "title": "Markdown descriptions",
+          "description": "Card descriptions support full markdown:\n\n- **bold**, *italic*, ~~strikethrough~~\n- `inline code` and fenced code blocks\n- [links](https://example.com) (open in a new tab)\n- bulleted and numbered lists\n- raw HTML, including `<video>` and `<iframe>` embeds\n\n> Click a card to view it, then hit **Edit** to change anything.",
+          "tags": ["feature"]
+        }
       ]
     },
     {
-      "id": "doing",
-      "title": "Doing",
+      "id": "try-it",
+      "title": "Try it",
       "cards": [
-        { "id": "3", "title": "Build basic HTML structure", "description": "Static page with JSON-driven rendering", "tags": ["feature"] }
+        {
+          "title": "Keyboard shortcuts",
+          "description": "The whole board is keyboard-friendly:\n\n- **Tab** through cards and controls\n- **Enter** or **Space** opens the focused card\n- **← →** move a card between columns\n- **↑ ↓** reorder a card within its column\n- **Esc** closes any open dialog\n\nMoves work whether you're focused on the board or have a card open.",
+          "tags": ["shortcut"]
+        },
+        {
+          "title": "Tags, your way",
+          "description": "Open **⚙ Settings** to rename tags, change their colors, add new ones, or delete the ones you don't use. Tag text auto-contrasts against the background color so every color stays readable.\n\nRenaming a tag updates every card that uses it.",
+          "tags": ["tip", "feature"]
+        },
+        {
+          "title": "Make it yours",
+          "description": "From **⚙ Settings** you can also:\n\n- rename the board\n- set a background image (tile, center, or stretch)\n- export the whole board to a JSON file\n- import a previously exported board\n\nThe board title auto-switches to white on dark backgrounds.",
+          "tags": ["tip"]
+        }
       ]
     },
     {
       "id": "done",
       "title": "Done",
-      "cards": []
+      "cards": [
+        {
+          "title": "Read this card ✅",
+          "description": "Nice. Finished work lives here.\n\nWhen you're ready to start fresh, delete each intro card with the red **Delete** button in its edit view, or clear everything by running `localStorage.clear()` in the browser console.",
+          "tags": ["intro"]
+        }
+      ]
     }
   ]
 }
