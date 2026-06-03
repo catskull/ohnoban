@@ -14,12 +14,16 @@
         {
           "title": "Welcome 👋",
           "description": "**ohnoban** is a personal kanban board that runs entirely in your browser.\n\nNo accounts, no servers — your board is saved in `localStorage` and survives reloads. Export to JSON anytime from the settings menu.\n\nDelete these intro cards when you're ready to make the board your own.",
-          "tags": ["intro"]
+          "tags": ["intro"],
+          "createdAt": "2026-05-20T09:00:00.000Z",
+          "updatedAt": "2026-05-20T09:00:00.000Z"
         },
         {
           "title": "Drag, drop, reorder",
           "description": "Drag any card to move it between columns or reorder within one. Drop targets stretch to the full column height while dragging so you can't miss.\n\nColumns themselves can be reordered with the **‹** and **›** buttons in their header.",
-          "tags": ["feature"]
+          "tags": ["feature"],
+          "createdAt": "2026-05-20T09:05:00.000Z",
+          "updatedAt": "2026-05-20T09:05:00.000Z"
         },
         {
           "title": "Markdown descriptions",
@@ -35,17 +39,23 @@
         {
           "title": "Keyboard shortcuts",
           "description": "The whole board is keyboard-friendly:\n\n- **Tab** through cards and controls\n- **Enter** or **Space** opens the focused card\n- **← →** move a card between columns\n- **↑ ↓** reorder a card within its column\n- **Esc** closes any open dialog\n\nMoves work whether you're focused on the board or have a card open.",
-          "tags": ["shortcut"]
+          "tags": ["shortcut"],
+          "createdAt": "2026-05-21T10:15:00.000Z",
+          "updatedAt": "2026-05-21T10:15:00.000Z"
         },
         {
           "title": "Tags, your way",
           "description": "Open **⚙ Settings** to rename tags, change their colors, add new ones, or delete the ones you don't use. Tag text auto-contrasts against the background color so every color stays readable.\n\nRenaming a tag updates every card that uses it.",
-          "tags": ["tip", "feature"]
+          "tags": ["tip", "feature"],
+          "createdAt": "2026-05-21T10:20:00.000Z",
+          "updatedAt": "2026-05-25T16:45:00.000Z"
         },
         {
           "title": "Make it yours",
           "description": "From **⚙ Settings** you can also:\n\n- rename the board\n- set a background image (tile, center, or stretch)\n- export the whole board to a JSON file\n- import a previously exported board\n\nThe board title auto-switches to white on dark backgrounds.",
-          "tags": ["tip"]
+          "tags": ["tip"],
+          "createdAt": "2026-05-21T10:25:00.000Z",
+          "updatedAt": "2026-05-21T10:25:00.000Z"
         }
       ]
     },
@@ -56,12 +66,16 @@
         {
           "title": "Read this card ✅",
           "description": "Nice. Finished work lives here.\n\nWhen you're ready to start fresh, delete each intro card with the red **Delete** button in its edit view, or clear everything by running `localStorage.clear()` in the browser console.",
-          "tags": ["intro"]
+          "tags": ["intro"],
+          "createdAt": "2026-05-20T09:15:00.000Z",
+          "updatedAt": "2026-05-28T11:00:00.000Z"
         },
         {
           "title": "Open source on GitHub",
           "description": "ohnoban lives at [github.com/catskull/ohnoban](https://github.com/catskull/ohnoban) — star it, fork it, or file an issue.",
-          "tags": ["intro"]
+          "tags": ["intro"],
+          "createdAt": "2026-05-20T09:20:00.000Z",
+          "updatedAt": "2026-05-28T11:00:00.000Z"
         }
       ]
     }

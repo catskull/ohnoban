@@ -39,6 +39,9 @@ ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
 .desc a { color: #2b4f8e; }
 .desc strong { display: inline; }
 .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+.card .timestamps { display: none; }
+.card-view .timestamps { font-size: .75rem; margin-top: .75rem; }
+.card-view .timestamps span { display: block; }
 .tag { font-size: .7rem; font-weight: 600; padding: .15rem .5rem; border-radius: .25rem; background: var(--tag-bg); color: oklch(from var(--tag-bg) calc((0.7 - l) * infinity) 0 0); border: 1px solid oklch(from var(--tag-bg) calc(l - 0.15) c h); }
 
 header { display: flex; align-items: center; padding: .75rem 1rem; padding-right: 9rem; }

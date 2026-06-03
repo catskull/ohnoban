@@ -125,23 +125,47 @@
         });
       }
 
+      function fmtTimestamp(iso) {
+        const d = new Date(iso);
+        if (isNaN(d)) return "";
+        return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      }
+
       function fillCard(el, card) {
         el.dataset.description = card.description || "";
+        if (card.createdAt) el.dataset.createdAt = card.createdAt;
+        else delete el.dataset.createdAt;
+        if (card.updatedAt) el.dataset.updatedAt = card.updatedAt;
+        else delete el.dataset.updatedAt;
+        const created = card.createdAt ? fmtTimestamp(card.createdAt) : "";
+        const updated = card.updatedAt && card.updatedAt !== card.createdAt ? fmtTimestamp(card.updatedAt) : "";
         el.innerHTML = `
           <strong>${esc(card.title)}</strong>
           ${card.description ? `<div class="desc">${marked.parse(card.description)}</div>` : ""}
           ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
             `<span class="tag" style="--tag-bg:${data.tags[t]}">${esc(t)}</span>`
           ).join("")}</div>` : ""}
+          ${created || updated ? `<div class="timestamps">${
+            created ? `<span>Created ${created}</span>` : ""
+          }${
+            updated ? `<span>Updated ${updated}</span>` : ""
+          }</div>` : ""}
         `;
       }
 
       function readCard(li) {
-        return {
+        const card = {
           title: li.querySelector("strong").textContent,
           description: li.dataset.description || "",
           tags: [...li.querySelectorAll(".tag")].map(t => t.textContent)
         };
+        if (li.dataset.createdAt) card.createdAt = li.dataset.createdAt;
+        if (li.dataset.updatedAt) card.updatedAt = li.dataset.updatedAt;
+        return card;
+      }
+
+      function touchUpdated(card) {
+        card.dataset.updatedAt = new Date().toISOString();
       }
 
       function renderCard(card) {
@@ -427,6 +451,7 @@
           if (!targetCol?.classList.contains("column")) return;
           e.preventDefault();
           targetCol.querySelector("ul").appendChild(card);
+          touchUpdated(card);
           updateCounts();
         } else {
           const sibling = e.key === "ArrowUp" ? card.previousElementSibling : card.nextElementSibling;
@@ -456,8 +481,16 @@
           if (!cardData.title) return;
 
           if (editingCard) {
+            const existing = readCard(editingCard);
+            const tagsChanged = existing.tags.slice().sort().join("\n") !== cardData.tags.slice().sort().join("\n");
+            const changed = existing.title !== cardData.title || existing.description !== cardData.description || tagsChanged;
+            cardData.createdAt = existing.createdAt;
+            cardData.updatedAt = changed ? new Date().toISOString() : existing.updatedAt;
             fillCard(editingCard, cardData);
           } else {
+            const now = new Date().toISOString();
+            cardData.createdAt = now;
+            cardData.updatedAt = now;
             targetUl.appendChild(renderCard(cardData));
           }
           updateCounts();
@@ -634,6 +667,7 @@
 
       // --- drag and drop ---
       let dragged = null;
+      let dragOriginCol = null;
       let overCol = null;
       let lastY = 0;
 
@@ -645,6 +679,7 @@
         const card = e.target.closest(".card");
         if (!card) return;
         dragged = card;
+        dragOriginCol = card.closest(".column");
         card.classList.add("dragging");
         board.classList.add("dragging");
       });
@@ -654,6 +689,7 @@
         board.classList.remove("dragging");
         clearDragOver();
         dragged = null;
+        dragOriginCol = null;
         lastY = 0;
       });
 
@@ -683,6 +719,9 @@
       board.addEventListener("drop", e => {
         e.preventDefault();
         clearDragOver();
+        if (dragged && dragOriginCol && dragged.closest(".column") !== dragOriginCol) {
+          touchUpdated(dragged);
+        }
         updateCounts();
         save();
       });
