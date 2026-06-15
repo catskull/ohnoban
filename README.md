@@ -13,6 +13,7 @@ A personal kanban board that runs entirely in the browser. No backend, no build 
 - **Column management** -- add, delete, and reorder columns
 - **localStorage persistence** -- all changes auto-save and survive page reloads
 - **JSON import/export** -- download your board as a JSON file or restore from one
+- **Shareable deep links** -- the URL hash reflects where you are: `#notes` opens the notes view, `#notes/<slug>` opens a specific note, and `#card/<slug>` opens a card. The slug is the title lowercased with spaces as hyphens (e.g. `#notes/example-note` opens the note titled "Example note")
 
 ## Getting started
 

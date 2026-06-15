@@ -290,6 +290,7 @@ function deleteNote(note) {
   data.notes.splice(i, 1);
   selectedNote = data.notes[i] || data.notes[i - 1] || null;
   commit();
+  reflectHash(noteHash(selectedNote));
 }
 
 function saveNoteEditor(form, note) {
@@ -303,6 +304,7 @@ function saveNoteEditor(form, note) {
     selectedNote = item;
   }
   commit();
+  reflectHash(noteHash(item));
 }
 
 // --- board interactions (delegated) ---
@@ -328,14 +330,14 @@ board.addEventListener("click", e => {
   if (e.target.closest("a[href]")) return; // links inside card descriptions
 
   const li = e.target.closest(".card");
-  if (li) openItemDialog(cardOf.get(li), columnOf.get(li.closest(".column")).cards);
+  if (li) openCard(cardOf.get(li), columnOf.get(li.closest(".column")).cards);
 });
 
 board.addEventListener("keydown", e => {
   if (e.key !== "Enter" && e.key !== " ") return;
   if (!e.target.classList.contains("card")) return;
   e.preventDefault();
-  openItemDialog(cardOf.get(e.target), columnOf.get(e.target.closest(".column")).cards);
+  openCard(cardOf.get(e.target), columnOf.get(e.target.closest(".column")).cards);
 });
 
 document.getElementById("add-column-btn").addEventListener("click", () => {
@@ -363,26 +365,98 @@ function setView(view) {
 
 tabBar.addEventListener("click", e => {
   const tab = e.target.closest(".tab");
-  if (tab) setView(tab.dataset.view);
+  if (!tab) return;
+  const view = tab.dataset.view;
+  setView(view);
+  reflectHash(view === "notes" ? noteHash(selectedNote) : "board", true);
 });
 
 addNoteBtn.addEventListener("click", () => showNoteEditor(null));
 
 notesListEl.addEventListener("click", e => {
   const li = e.target.closest(".note-list-item");
-  if (li) selectNote(cardOf.get(li));
+  if (!li) return;
+  const note = cardOf.get(li);
+  selectNote(note);
+  reflectHash(noteHash(note));
 });
 
 notesListEl.addEventListener("keydown", e => {
   const li = e.target.closest(".note-list-item");
   if (!li || (e.key !== "Enter" && e.key !== " ")) return;
   e.preventDefault();
-  selectNote(cardOf.get(li));
+  const note = cardOf.get(li);
+  selectNote(note);
+  reflectHash(noteHash(note));
 });
 
 noteDetailEl.addEventListener("click", e => {
   if (e.target.closest(".note-edit-btn")) showNoteEditor(selectedNote);
 });
+
+// --- routing (hash deep links) ---
+// The URL hash mirrors navigation state: #board, #notes, #notes/<slug>,
+// #card/<slug> (slug = the title, lowercased and hyphenated). The handlers
+// above change state directly and call reflectHash to update the URL via
+// push/replaceState — which do NOT fire hashchange. applyHash runs only for
+// real URL changes (initial load, manual edits, back/forward) and drives state
+// from the hash. Duplicate titles share a slug; the first match wins.
+
+function slugify(s) {
+  return (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function noteHash(note) {
+  return note ? "notes/" + slugify(note.title) : "notes";
+}
+
+function noteBySlug(slug) {
+  return data.notes.find(n => slugify(n.title) === slug) || null;
+}
+
+function cardBySlug(slug) {
+  for (const col of data.columns) {
+    const card = col.cards.find(c => slugify(c.title) === slug);
+    if (card) return { card, cards: col.cards };
+  }
+  return null;
+}
+
+function openCard(card, cards) {
+  openItemDialog(card, cards);
+  reflectHash("card/" + slugify(card.title));
+}
+
+function reflectHash(hash, push) {
+  const url = "#" + hash;
+  if (location.hash === url) return;
+  if (push) history.pushState(null, "", url);
+  else history.replaceState(null, "", url);
+}
+
+function applyHash() {
+  const raw = location.hash.replace(/^#/, "");
+  const sep = raw.indexOf("/");
+  const section = sep === -1 ? raw : raw.slice(0, sep);
+  const slug = sep === -1 ? "" : raw.slice(sep + 1);
+
+  if (section === "card") {
+    setView("board");
+    const found = slug && cardBySlug(slug);
+    if (found && !dialog.open) openItemDialog(found.card, found.cards);
+    return;
+  }
+  if (dialog.open) dialog.close(); // navigating away from a card closes it
+  if (section === "notes") {
+    setView("notes");
+    const note = slug && noteBySlug(slug);
+    if (note) selectNote(note);
+  } else {
+    setView("board");
+  }
+}
+
+window.addEventListener("hashchange", applyHash);
 
 // --- columns ---
 
@@ -516,6 +590,7 @@ dialog.addEventListener("close", () => {
   editingItem = null;
   editingContainer = null;
   form.description.style.height = "";
+  if (location.hash.startsWith("#card")) reflectHash("board");
 });
 
 // Arrow keys move the focused card (or the open card while viewing it):
@@ -860,7 +935,7 @@ function init(initial) {
   renderBoard();
   renderNotes();
   applyBackground();
-  setView("board");
+  applyHash(); // open the view / note / card named in the URL
 }
 
 const saved = localStorage.getItem("ohnoban-board");
