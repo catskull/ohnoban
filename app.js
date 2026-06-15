@@ -1,5 +1,7 @@
 marked.setOptions({ breaks: true, gfm: true });
 
+// Safari and Firefox on macOS skip buttons and links when tabbing unless they
+// carry an explicit tabindex.
 const TABBABLE = "button, a[href], input:not([type=hidden]), select, textarea";
 function ensureTabbable(root) {
   if (root.matches?.(TABBABLE) && !root.hasAttribute("tabindex")) root.tabIndex = 0;
@@ -16,644 +18,99 @@ new MutationObserver(mutations => {
 }).observe(document.documentElement, { childList: true, subtree: true });
 ensureTabbable(document.body);
 
-function loadBoard(data) {
-  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+// --- helpers ---
 
-  document.getElementById("board-title").textContent = data.title;
-  const board = document.getElementById("board");
-  const dialog = document.getElementById("card-dialog");
-  const form = dialog.querySelector("form");
-  const tagOptions = document.getElementById("tag-options");
-  let editingCard = null;
-  let targetUl = null;
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
-  const cardView = dialog.querySelector(".card-view");
-  const cardEditDiv = dialog.querySelector(".card-edit");
+function now() {
+  return new Date().toISOString();
+}
 
-  // --- helpers ---
-  function esc(s) {
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
+function fmtTimestamp(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
 
-  function pickFile(btnId, inputId, onFile) {
-    const input = document.getElementById(inputId);
-    document.getElementById(btnId).addEventListener("click", () => input.click());
-    input.addEventListener("change", () => {
-      const file = input.files[0];
-      if (!file) return;
-      onFile(file);
-      input.value = "";
-    });
-  }
-
-  function fmtTimestamp(iso) {
-    const d = new Date(iso);
-    if (isNaN(d)) return "";
-    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  }
-
-  function fillCard(el, card) {
-    el.dataset.description = card.description || "";
-    if (card.createdAt) el.dataset.createdAt = card.createdAt;
-    else delete el.dataset.createdAt;
-    if (card.updatedAt) el.dataset.updatedAt = card.updatedAt;
-    else delete el.dataset.updatedAt;
-    const created = card.createdAt ? fmtTimestamp(card.createdAt) : "";
-    const updated = card.updatedAt && card.updatedAt !== card.createdAt ? fmtTimestamp(card.updatedAt) : "";
-    el.innerHTML = `
-      <strong>${esc(card.title)}</strong>
-      ${card.description ? `<div class="desc">${marked.parse(card.description)}</div>` : ""}
-      ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
-        `<span class="tag" style="--tag-bg:${data.tags[t]}">${esc(t)}</span>`
-      ).join("")}</div>` : ""}
-      ${created || updated ? `<div class="timestamps">${
-        created ? `<span>Created ${created}</span>` : ""
-      }${
-        updated ? `<span>Updated ${updated}</span>` : ""
-      }</div>` : ""}
-    `;
-  }
-
-  function readCard(li) {
-    const card = {
-      title: li.querySelector("strong").textContent,
-      description: li.dataset.description || "",
-      tags: [...li.querySelectorAll(".tag")].map(t => t.textContent)
-    };
-    if (li.dataset.createdAt) card.createdAt = li.dataset.createdAt;
-    if (li.dataset.updatedAt) card.updatedAt = li.dataset.updatedAt;
-    return card;
-  }
-
-  function touchUpdated(card) {
-    card.dataset.updatedAt = new Date().toISOString();
-  }
-
-  function renderCard(card) {
-    const li = document.createElement("li");
-    li.className = "card";
-    li.draggable = true;
-    li.tabIndex = 0;
-    li.setAttribute("role", "button");
-    fillCard(li, card);
-    return li;
-  }
-
-  function updateCounts() {
-    document.querySelectorAll(".column").forEach(col => {
-      col.querySelector(".count").textContent = col.querySelectorAll(".card").length;
-    });
-  }
-
-  // --- persistence ---
-  function serializeBoard() {
-    const columns = [...document.querySelectorAll(".column")].map(col => ({
-      id: col.dataset.columnId,
-      title: col.querySelector(".col-title").textContent,
-      cards: [...col.querySelectorAll(".card")].map(li => readCard(li))
-    }));
-    const out = { title: data.title, tags: { ...data.tags }, columns };
-    if (data.background?.image) out.background = { ...data.background };
-    return out;
-  }
-
-  let quotaWarned = false;
-  function save() {
-    try {
-      const { background, ...rest } = serializeBoard();
-      localStorage.setItem("ohnoban-board", JSON.stringify(rest));
-      quotaWarned = false;
-    } catch (e) {
-      if (!quotaWarned) {
-        quotaWarned = true;
-        alert("Could not save the board.\n\n" + e.message);
-      }
-    }
-  }
-  function saveBackground() {
-    try {
-      if (data.background?.image) localStorage.setItem("ohnoban-bg", JSON.stringify(data.background));
-      else localStorage.removeItem("ohnoban-bg");
-      quotaWarned = false;
-    } catch (e) {
-      quotaWarned = true;
-      alert("Background image is too large for local storage.\n\n" + e.message);
-      data.background = null;
-      localStorage.removeItem("ohnoban-bg");
-      applyBackground();
-    }
-  }
-
-  const BG_MODES = {
-    tile:    { backgroundRepeat: "repeat",    backgroundSize: "auto",  backgroundPosition: "" },
-    center:  { backgroundRepeat: "no-repeat", backgroundSize: "auto",  backgroundPosition: "center center" },
-    stretch: { backgroundRepeat: "no-repeat", backgroundSize: "cover", backgroundPosition: "center" },
-  };
-  const BG_CONTRAST_SAMPLE = 64;
-  const BG_DARK_THRESHOLD = 0.5;
-  let bgContrastToken = 0;
-  let lastContrastImage = null, lastContrastDark = false;
-  function updateBgContrast() {
-    const bg = data.background;
-    if (!bg?.image) {
-      lastContrastImage = null;
-      document.body.classList.remove("bg-dark");
-      return;
-    }
-    if (bg.image === lastContrastImage) {
-      document.body.classList.toggle("bg-dark", lastContrastDark);
-      return;
-    }
-    const token = ++bgContrastToken;
-    const img = new Image();
-    img.onload = () => {
-      if (token !== bgContrastToken) return;
-      const w = Math.min(BG_CONTRAST_SAMPLE, img.naturalWidth) || 1;
-      const h = Math.min(BG_CONTRAST_SAMPLE, img.naturalHeight) || 1;
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-      const px = ctx.getImageData(0, 0, w, h).data;
-      const pixelCount = px.length / 4;
-      let sum = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        sum += 0.2126 * px[i] + 0.7152 * px[i+1] + 0.0722 * px[i+2];
-      }
-      const avg = sum / pixelCount / 255;
-      lastContrastImage = bg.image;
-      lastContrastDark = avg < BG_DARK_THRESHOLD;
-      document.body.classList.toggle("bg-dark", lastContrastDark);
-    };
-    img.onerror = () => { if (token === bgContrastToken) lastContrastImage = null; };
-    img.src = bg.image;
-  }
-  function applyBackground() {
-    const bg = data.background;
-    Object.assign(document.body.style, {
-      backgroundImage: bg?.image ? `url("${bg.image}")` : "",
-      backgroundAttachment: "fixed",
-      ...(bg?.image ? (BG_MODES[bg.mode] ?? BG_MODES.tile) : {}),
-    });
-    updateBgContrast();
-  }
-  applyBackground();
-
-  // --- board rendering ---
-  function renderColumn(col) {
-    const section = document.createElement("section");
-    section.className = "column";
-    section.dataset.columnId = col.id;
-
-    const header = document.createElement("h2");
-    header.innerHTML = `<span class="col-title" title="Click to rename">${esc(col.title)}</span><span class="count">${col.cards.length}</span>`;
-
-    const titleEl = header.querySelector(".col-title");
-    titleEl.addEventListener("click", () => {
-      if (titleEl.isContentEditable) return;
-      const original = titleEl.textContent;
-      titleEl.contentEditable = "true";
-      titleEl.focus();
-      const range = document.createRange();
-      range.selectNodeContents(titleEl);
-      const sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-
-      const finish = (commit) => {
-        titleEl.removeEventListener("keydown", onKey);
-        titleEl.removeEventListener("blur", onBlur);
-        titleEl.removeEventListener("paste", onPaste);
-        titleEl.removeAttribute("contenteditable");
-        const next = titleEl.textContent.trim();
-        if (commit && next && next !== original) {
-          titleEl.textContent = next;
-          save();
-        } else {
-          titleEl.textContent = original;
-        }
-      };
-      const onKey = (e) => {
-        if (e.key === "Enter") { e.preventDefault(); finish(true); }
-        else if (e.key === "Escape") { e.preventDefault(); finish(false); }
-      };
-      const onBlur = () => finish(true);
-      const onPaste = (e) => {
-        e.preventDefault();
-        const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s+/g, " ");
-        const sel = window.getSelection();
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        const node = document.createTextNode(text);
-        range.insertNode(node);
-        range.setStartAfter(node);
-        range.setEndAfter(node);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      };
-      titleEl.addEventListener("keydown", onKey);
-      titleEl.addEventListener("blur", onBlur);
-      titleEl.addEventListener("paste", onPaste);
-    });
-
-    const colActions = document.createElement("span");
-    colActions.className = "col-actions";
-    colActions.innerHTML = `<button class="col-move-btn" data-dir="left" title="Move left" tabindex="-1">\u2039</button><button class="col-move-btn" data-dir="right" title="Move right" tabindex="-1">\u203a</button><button class="col-delete-btn" title="Delete column" tabindex="-1">\u00d7</button>`;
-    colActions.querySelector(".col-delete-btn").addEventListener("click", () => {
-      const cards = section.querySelectorAll(".card").length;
-      if (cards > 0 && !confirm(`Delete "${titleEl.textContent}" and its ${cards} card${cards > 1 ? "s" : ""}?`)) return;
-      section.remove();
-      save();
-    });
-    colActions.addEventListener("click", e => {
-      const btn = e.target.closest(".col-move-btn");
-      if (!btn) return;
-      const dir = btn.dataset.dir;
-      const sibling = dir === "left" ? section.previousElementSibling : section.nextElementSibling;
-      if (!sibling?.classList.contains("column")) return;
-      dir === "left" ? sibling.before(section) : sibling.after(section);
-      save();
-    });
-    header.appendChild(colActions);
-
-    const addLink = document.createElement("a");
-    addLink.className = "add-card";
-    addLink.textContent = "+ Add card";
-    addLink.href = "#";
-
-    const ul = document.createElement("ul");
-    ul.append(...col.cards.map(renderCard));
-
-    section.append(header, addLink, ul);
-    return section;
-  }
-
-  function renderBoard() {
-    board.replaceChildren(...data.columns.map(renderColumn));
-  }
-
-  document.getElementById("add-column-btn").addEventListener("click", () => {
-    const title = prompt("Column name:");
-    if (!title?.trim()) return;
-    const id = title.trim().toLowerCase().replace(/\s+/g, "-");
-    board.appendChild(renderColumn({ id, title: title.trim(), cards: [] }));
-    save();
+function pickFile(btnId, inputId, onFile) {
+  const input = document.getElementById(inputId);
+  document.getElementById(btnId).addEventListener("click", () => input.click());
+  input.addEventListener("change", () => {
+    const file = input.files[0];
+    if (!file) return;
+    onFile(file);
+    input.value = "";
   });
+}
+
+// Close on backdrop click, but only when both mousedown and click land on the
+// backdrop, so drag-selecting text inside the dialog can't dismiss it.
+function closeOnBackdropClick(dlg) {
+  let downTarget = null;
+  dlg.addEventListener("mousedown", e => downTarget = e.target);
+  dlg.addEventListener("click", e => {
+    if (e.target === dlg && downTarget === dlg) dlg.close("cancel");
+  });
+}
+
+// --- state ---
+// `data` is the single source of truth: { title, tags, columns, background }.
+// The board DOM is a projection of it: mutations update `data`, then call
+// commit() to re-render and save. The WeakMaps link rendered elements back to
+// the state objects they were rendered from.
+
+let data = null;
+const cardOf = new WeakMap();   // card <li> -> card object in data
+const columnOf = new WeakMap(); // column <section> -> column object in data
+
+const board = document.getElementById("board");
+
+function commit() {
   renderBoard();
+  save();
+}
 
-  // --- card dialog ---
-  function setMode(mode) {
-    const viewing = mode === "view";
-    cardView.hidden = !viewing;
-    cardEditDiv.hidden = viewing;
-    dialog.querySelector(".view-actions").hidden = !viewing;
-    dialog.querySelector(".edit-actions").hidden = viewing;
-    dialog.querySelector(".delete-btn").hidden = !editingCard;
-  }
+function columnContaining(card) {
+  return data.columns.find(col => col.cards.includes(card));
+}
 
-  function populateForm(cardData) {
-    form.title.value = cardData.title;
-    form.description.value = cardData.description;
-    form.querySelectorAll('input[name="tags"]').forEach(cb => {
-      cb.checked = cardData.tags.includes(cb.value);
-    });
-  }
+function elementFor(card) {
+  return [...board.querySelectorAll(".card")].find(li => cardOf.get(li) === card);
+}
 
-  function openDialog(card, mode) {
-    if (card) {
-      editingCard = card;
-      const cardData = readCard(card);
-      populateForm(cardData);
-      fillCard(cardView, cardData);
+// --- persistence ---
+// The board lives under "ohnoban-board"; the background image is stored
+// separately under "ohnoban-bg" so an oversized image can't take the rest of
+// the board down with it.
+
+let quotaWarned = false;
+
+function save() {
+  try {
+    const { background, ...rest } = data;
+    localStorage.setItem("ohnoban-board", JSON.stringify(rest));
+    quotaWarned = false;
+  } catch (e) {
+    if (!quotaWarned) {
+      quotaWarned = true;
+      alert("Could not save the board.\n\n" + e.message);
     }
-    setMode(mode);
-    dialog.showModal();
   }
+}
 
-  board.addEventListener("click", e => {
-    const addLink = e.target.closest(".add-card");
-    if (addLink) {
-      e.preventDefault();
-      editingCard = null;
-      targetUl = addLink.closest(".column").querySelector("ul");
-      form.reset();
-      openDialog(null, "edit");
-      return;
-    }
-
-    if (e.target.closest("a[href]")) return;
-
-    const card = e.target.closest(".card");
-    if (card) {
-      targetUl = null;
-      openDialog(card, "view");
-    }
-  });
-
-  board.addEventListener("keydown", e => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    const card = e.target.closest(".card");
-    if (!card || card !== e.target) return;
-    e.preventDefault();
-    targetUl = null;
-    openDialog(card, "view");
-  });
-
-  document.addEventListener("keydown", e => {
-    if (!e.key.startsWith("Arrow")) return;
-    const tag = e.target.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
-    const card = dialog.open ? editingCard : (e.target.classList.contains("card") ? e.target : null);
-    if (!card) return;
-
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-      const currentCol = card.closest(".column");
-      const targetCol = e.key === "ArrowLeft" ? currentCol.previousElementSibling : currentCol.nextElementSibling;
-      if (!targetCol?.classList.contains("column")) return;
-      e.preventDefault();
-      targetCol.querySelector("ul").appendChild(card);
-      touchUpdated(card);
-      updateCounts();
-    } else {
-      const sibling = e.key === "ArrowUp" ? card.previousElementSibling : card.nextElementSibling;
-      if (!sibling?.classList.contains("card")) return;
-      e.preventDefault();
-      e.key === "ArrowUp" ? sibling.before(card) : sibling.after(card);
-    }
-    save();
-    if (!dialog.open) card.focus();
-  });
-
-  dialog.querySelector(".edit-btn").addEventListener("click", () => setMode("edit"));
-
-  let mouseDownTarget = null;
-  dialog.addEventListener("mousedown", e => mouseDownTarget = e.target);
-  dialog.addEventListener("click", e => {
-    if (e.target === dialog && mouseDownTarget === dialog) dialog.close("cancel");
-  });
-
-  dialog.addEventListener("close", () => {
-    if (dialog.returnValue === "save") {
-      const cardData = {
-        title: form.title.value.trim(),
-        description: form.description.value.trim(),
-        tags: [...form.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value)
-      };
-      if (!cardData.title) return;
-
-      if (editingCard) {
-        const existing = readCard(editingCard);
-        const tagsChanged = existing.tags.slice().sort().join("\n") !== cardData.tags.slice().sort().join("\n");
-        const changed = existing.title !== cardData.title || existing.description !== cardData.description || tagsChanged;
-        cardData.createdAt = existing.createdAt;
-        cardData.updatedAt = changed ? new Date().toISOString() : existing.updatedAt;
-        fillCard(editingCard, cardData);
-      } else {
-        const now = new Date().toISOString();
-        cardData.createdAt = now;
-        cardData.updatedAt = now;
-        targetUl.appendChild(renderCard(cardData));
-      }
-      updateCounts();
-      save();
-    } else if (dialog.returnValue === "delete" && editingCard) {
-      editingCard.remove();
-      updateCounts();
-      save();
-    }
-    editingCard = null;
-    targetUl = null;
-    form.description.style.height = "";
-  });
-
-  // --- tag management ---
-  const settingsDialog = document.getElementById("settings-dialog");
-  const tagList = document.getElementById("tag-list");
-  const boardNameInput = document.getElementById("board-name-input");
-
-  function rebuildTagCheckboxes() {
-    const legend = tagOptions.querySelector("legend");
-    const labels = Object.entries(data.tags).map(([name, color]) => {
-      const lbl = document.createElement("label");
-      lbl.className = "tag-option";
-      lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="--tag-bg:${color}">${name}</span>`;
-      return lbl;
-    });
-    tagOptions.replaceChildren(legend, ...labels);
-  }
-  rebuildTagCheckboxes();
-
-  function createTagRow(name, color) {
-    const row = document.createElement("div");
-    row.className = "tag-row";
-    row.dataset.originalName = name;
-    row.innerHTML = `<input type="color" value="${color}" class="tag-color"><input type="text" value="${esc(name)}" class="tag-name" required><button type="button" class="tag-delete-btn" title="Delete tag">&times;</button>`;
-    row.querySelector(".tag-delete-btn").addEventListener("click", () => row.remove());
-    return row;
-  }
-
-  function populateTagManager() {
-    tagList.replaceChildren(...Object.entries(data.tags).map(e => createTagRow(...e)));
-  }
-
-  function refreshAllCards(renames, deletions) {
-    document.querySelectorAll(".card").forEach(li => {
-      const cardData = readCard(li);
-      cardData.tags = cardData.tags.map(t => renames[t] || t).filter(t => !deletions.has(t));
-      fillCard(li, cardData);
-    });
-  }
-
-  // --- background management ---
-  const bgPreview = document.getElementById("bg-preview");
-  const bgEmpty = document.getElementById("bg-empty");
-  const bgMode = document.getElementById("bg-mode");
-  const bgRemoveBtn = document.getElementById("bg-remove-btn");
-  let pendingBg = null;
-
-  function refreshBgPreview() {
-    const hasImage = !!pendingBg?.image;
-    if (hasImage) {
-      bgPreview.src = pendingBg.image;
-    } else {
-      bgPreview.removeAttribute("src");
-    }
-    bgPreview.hidden = !hasImage;
-    bgEmpty.hidden = hasImage;
-    bgMode.hidden = !hasImage;
-    bgRemoveBtn.hidden = !hasImage;
-  }
-
-  pickFile("bg-choose-btn", "bg-file", file => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      pendingBg = { image: reader.result };
-      refreshBgPreview();
-    };
-    reader.readAsDataURL(file);
-  });
-  document.getElementById("bg-remove-btn").addEventListener("click", () => {
-    pendingBg = { image: null };
-    refreshBgPreview();
-  });
-
-  document.getElementById("settings-btn").addEventListener("click", () => {
-    boardNameInput.value = data.title;
-    populateTagManager();
-    pendingBg = { image: data.background?.image ?? null };
-    bgMode.value = data.background?.mode ?? "tile";
-    refreshBgPreview();
-    settingsDialog.showModal();
-  });
-
-  document.getElementById("add-tag-btn").addEventListener("click", () => {
-    tagList.appendChild(createTagRow("", "#888888"));
-    tagList.lastElementChild.querySelector(".tag-name").focus();
-  });
-
-  let settingsMouseDown = null;
-  settingsDialog.addEventListener("mousedown", e => settingsMouseDown = e.target);
-  settingsDialog.addEventListener("click", e => {
-    if (e.target === settingsDialog && settingsMouseDown === settingsDialog) settingsDialog.close("cancel");
-  });
-
-  settingsDialog.addEventListener("close", () => {
-    if (settingsDialog.returnValue !== "save") return;
-
-    const newName = boardNameInput.value.trim();
-    if (newName) {
-      data.title = newName;
-      document.getElementById("board-title").textContent = newName;
-    }
-
-    const renames = {};
-    const deletions = new Set(Object.keys(data.tags));
-    const newTags = {};
-
-    tagList.querySelectorAll(".tag-row").forEach(row => {
-      const name = row.querySelector(".tag-name").value.trim();
-      const color = row.querySelector(".tag-color").value;
-      if (!name) return;
-      const original = row.dataset.originalName;
-      newTags[name] = color;
-      if (original) {
-        deletions.delete(original);
-        if (original !== name) renames[original] = name;
-      }
-    });
-
-    data.tags = newTags;
-    refreshAllCards(renames, deletions);
-    rebuildTagCheckboxes();
-
-    data.background = pendingBg?.image ? { image: pendingBg.image, mode: bgMode.value || "tile" } : null;
+function saveBackground() {
+  try {
+    if (data.background?.image) localStorage.setItem("ohnoban-bg", JSON.stringify(data.background));
+    else localStorage.removeItem("ohnoban-bg");
+    quotaWarned = false;
+  } catch (e) {
+    quotaWarned = true;
+    alert("Background image is too large for local storage.\n\n" + e.message);
+    data.background = null;
+    localStorage.removeItem("ohnoban-bg");
     applyBackground();
-
-    save();
-    saveBackground();
-  });
-
-  // --- import/export ---
-  document.getElementById("export-btn").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(serializeBoard(), null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "board.json";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  pickFile("import-btn", "import-file", async file => {
-    try {
-      const imported = JSON.parse(await file.text());
-      if (!imported.title || !imported.columns || !Array.isArray(imported.columns)) {
-        alert("Invalid board file.");
-        return;
-      }
-      data.title = imported.title;
-      data.tags = imported.tags || {};
-      data.columns = imported.columns;
-      data.background = imported.background || null;
-      document.getElementById("board-title").textContent = data.title;
-      rebuildTagCheckboxes();
-      renderBoard();
-      applyBackground();
-      save();
-      saveBackground();
-      settingsDialog.close("cancel");
-    } catch (e) {
-      alert("Could not parse JSON file.");
-    }
-  });
-
-  // --- drag and drop ---
-  let dragged = null;
-  let dragOriginCol = null;
-  let overCol = null;
-  let lastY = 0;
-
-  function clearDragOver() {
-    if (overCol) { overCol.classList.remove("drag-over"); overCol = null; }
-  }
-
-  board.addEventListener("dragstart", e => {
-    const card = e.target.closest(".card");
-    if (!card) return;
-    dragged = card;
-    dragOriginCol = card.closest(".column");
-    card.classList.add("dragging");
-    board.classList.add("dragging");
-  });
-
-  board.addEventListener("dragend", () => {
-    if (dragged) dragged.classList.remove("dragging");
-    board.classList.remove("dragging");
-    clearDragOver();
-    dragged = null;
-    dragOriginCol = null;
-    lastY = 0;
-  });
-
-  board.addEventListener("dragover", e => {
-    e.preventDefault();
-    const col = e.target.closest(".column");
-    if (!col) return;
-
-    if (col !== overCol) {
-      clearDragOver();
-      overCol = col;
-      col.classList.add("drag-over");
-    }
-
-    if (Math.abs(e.clientY - lastY) < 5) return;
-    lastY = e.clientY;
-
-    const ul = col.querySelector("ul");
-    const afterCard = getDragAfterCard(ul, e.clientY);
-    if (afterCard) {
-      ul.insertBefore(dragged, afterCard);
-    } else {
-      ul.appendChild(dragged);
-    }
-  });
-
-  board.addEventListener("drop", e => {
-    e.preventDefault();
-    clearDragOver();
-    if (dragged && dragOriginCol && dragged.closest(".column") !== dragOriginCol) {
-      touchUpdated(dragged);
-    }
-    updateCounts();
-    save();
-  });
-
-  function getDragAfterCard(ul, y) {
-    const cards = [...ul.querySelectorAll(".card:not(.dragging)")];
-    for (const card of cards) {
-      const box = card.getBoundingClientRect();
-      if (y < box.top + box.height / 2) return card;
-    }
-    return null;
   }
 }
 
@@ -663,18 +120,580 @@ function readSavedBackground() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-// --- load from localStorage or board.json ---
+// --- rendering ---
+
+function fillCard(el, card) {
+  const created = card.createdAt ? fmtTimestamp(card.createdAt) : "";
+  const updated = card.updatedAt && card.updatedAt !== card.createdAt ? fmtTimestamp(card.updatedAt) : "";
+  el.innerHTML = `
+    <strong>${esc(card.title)}</strong>
+    ${card.description ? `<div class="desc">${marked.parse(card.description)}</div>` : ""}
+    ${(card.tags || []).length ? `<div class="tags">${card.tags.map(t =>
+      `<span class="tag" style="--tag-bg:${data.tags[t]}">${esc(t)}</span>`
+    ).join("")}</div>` : ""}
+    ${created || updated ? `<div class="timestamps">${
+      created ? `<span>Created ${created}</span>` : ""
+    }${
+      updated ? `<span>Updated ${updated}</span>` : ""
+    }</div>` : ""}
+  `;
+}
+
+function renderCard(card) {
+  const li = document.createElement("li");
+  li.className = "card";
+  li.draggable = true;
+  li.tabIndex = 0;
+  li.setAttribute("role", "button");
+  cardOf.set(li, card);
+  fillCard(li, card);
+  return li;
+}
+
+function renderColumn(col) {
+  const section = document.createElement("section");
+  section.className = "column";
+  columnOf.set(section, col);
+  section.innerHTML = `
+    <h2>
+      <span class="col-title" title="Click to rename">${esc(col.title)}</span>
+      <span class="count">${col.cards.length}</span>
+      <span class="col-actions">
+        <button class="col-move-btn" data-dir="left" title="Move left" tabindex="-1">‹</button>
+        <button class="col-move-btn" data-dir="right" title="Move right" tabindex="-1">›</button>
+        <button class="col-delete-btn" title="Delete column" tabindex="-1">×</button>
+      </span>
+    </h2>
+    <a class="add-card" href="#">+ Add card</a>
+  `;
+  const ul = document.createElement("ul");
+  ul.append(...col.cards.map(renderCard));
+  section.append(ul);
+  return section;
+}
+
+function renderBoard() {
+  board.replaceChildren(...data.columns.map(renderColumn));
+}
+
+// --- board interactions (delegated) ---
+
+board.addEventListener("click", e => {
+  const addLink = e.target.closest(".add-card");
+  if (addLink) {
+    e.preventDefault();
+    openNewCardDialog(columnOf.get(addLink.closest(".column")));
+    return;
+  }
+
+  const titleEl = e.target.closest(".col-title");
+  if (titleEl) return startColumnRename(titleEl);
+
+  const moveBtn = e.target.closest(".col-move-btn");
+  if (moveBtn) return moveColumn(columnOf.get(moveBtn.closest(".column")), moveBtn.dataset.dir);
+
+  if (e.target.closest(".col-delete-btn")) {
+    return deleteColumn(columnOf.get(e.target.closest(".column")));
+  }
+
+  if (e.target.closest("a[href]")) return; // links inside card descriptions
+
+  const li = e.target.closest(".card");
+  if (li) openCardDialog(cardOf.get(li));
+});
+
+board.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  if (!e.target.classList.contains("card")) return;
+  e.preventDefault();
+  openCardDialog(cardOf.get(e.target));
+});
+
+document.getElementById("add-column-btn").addEventListener("click", () => {
+  const title = prompt("Column name:")?.trim();
+  if (!title) return;
+  data.columns.push({ id: title.toLowerCase().replace(/\s+/g, "-"), title, cards: [] });
+  commit();
+});
+
+// --- columns ---
+
+function moveColumn(col, dir) {
+  const i = data.columns.indexOf(col);
+  const j = dir === "left" ? i - 1 : i + 1;
+  if (j < 0 || j >= data.columns.length) return;
+  [data.columns[i], data.columns[j]] = [data.columns[j], data.columns[i]];
+  commit();
+}
+
+function deleteColumn(col) {
+  const n = col.cards.length;
+  if (n > 0 && !confirm(`Delete "${col.title}" and its ${n} card${n > 1 ? "s" : ""}?`)) return;
+  data.columns = data.columns.filter(c => c !== col);
+  commit();
+}
+
+function startColumnRename(titleEl) {
+  if (titleEl.isContentEditable) return;
+  const col = columnOf.get(titleEl.closest(".column"));
+  const original = col.title;
+  titleEl.contentEditable = "true";
+  titleEl.focus();
+  const range = document.createRange();
+  range.selectNodeContents(titleEl);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+
+  const finish = (keep) => {
+    titleEl.removeEventListener("keydown", onKey);
+    titleEl.removeEventListener("blur", onBlur);
+    titleEl.removeEventListener("paste", onPaste);
+    titleEl.removeAttribute("contenteditable");
+    const next = titleEl.textContent.trim();
+    if (keep && next && next !== original) {
+      col.title = next;
+      commit();
+    } else {
+      titleEl.textContent = original;
+    }
+  };
+  const onKey = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  };
+  const onBlur = () => finish(true);
+  const onPaste = (e) => {
+    // paste as plain text, collapsed to a single line
+    e.preventDefault();
+    const text = (e.clipboardData?.getData("text/plain") || "").replace(/\s+/g, " ");
+    const sel = window.getSelection();
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.setEndAfter(node);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
+  titleEl.addEventListener("keydown", onKey);
+  titleEl.addEventListener("blur", onBlur);
+  titleEl.addEventListener("paste", onPaste);
+}
+
+// --- card dialog ---
+
+const dialog = document.getElementById("card-dialog");
+const form = dialog.querySelector("form");
+const cardView = dialog.querySelector(".card-view");
+const tagOptions = document.getElementById("tag-options");
+let editingCard = null;  // card object being viewed/edited, null when adding
+let targetColumn = null; // column object receiving a new card
+
+function setMode(mode) {
+  const viewing = mode === "view";
+  cardView.hidden = !viewing;
+  dialog.querySelector(".card-edit").hidden = viewing;
+  dialog.querySelector(".view-actions").hidden = !viewing;
+  dialog.querySelector(".edit-actions").hidden = viewing;
+  dialog.querySelector(".delete-btn").hidden = !editingCard;
+}
+
+function openCardDialog(card) {
+  editingCard = card;
+  targetColumn = null;
+  form.title.value = card.title;
+  form.description.value = card.description || "";
+  form.querySelectorAll('input[name="tags"]').forEach(cb => {
+    cb.checked = (card.tags || []).includes(cb.value);
+  });
+  fillCard(cardView, card);
+  setMode("view");
+  dialog.returnValue = "";
+  dialog.showModal();
+}
+
+function openNewCardDialog(col) {
+  editingCard = null;
+  targetColumn = col;
+  form.reset();
+  setMode("edit");
+  dialog.returnValue = "";
+  dialog.showModal();
+}
+
+dialog.querySelector(".edit-btn").addEventListener("click", () => setMode("edit"));
+closeOnBackdropClick(dialog);
+
+dialog.addEventListener("close", () => {
+  if (dialog.returnValue === "save") {
+    const title = form.title.value.trim();
+    const description = form.description.value.trim();
+    const tags = [...form.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value);
+    if (title) {
+      let card = editingCard;
+      if (card) {
+        const changed = card.title !== title ||
+          (card.description || "") !== description ||
+          (card.tags || []).slice().sort().join("\n") !== tags.slice().sort().join("\n");
+        Object.assign(card, { title, description, tags });
+        if (changed) card.updatedAt = now();
+      } else {
+        card = { title, description, tags, createdAt: now(), updatedAt: now() };
+        targetColumn.cards.push(card);
+      }
+      commit();
+      elementFor(card)?.focus();
+    }
+  } else if (dialog.returnValue === "delete" && editingCard) {
+    const col = columnContaining(editingCard);
+    col.cards = col.cards.filter(c => c !== editingCard);
+    commit();
+  }
+  editingCard = null;
+  targetColumn = null;
+  form.description.style.height = "";
+});
+
+// Arrow keys move the focused card (or the open card while viewing it):
+// left/right across columns, up/down within a column.
+document.addEventListener("keydown", e => {
+  if (!e.key.startsWith("Arrow")) return;
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+  const card = dialog.open ? editingCard : cardOf.get(e.target);
+  if (!card) return;
+  const col = columnContaining(card);
+  const idx = col.cards.indexOf(card);
+
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    const colIdx = data.columns.indexOf(col);
+    const target = data.columns[colIdx + (e.key === "ArrowLeft" ? -1 : 1)];
+    if (!target) return;
+    e.preventDefault();
+    col.cards.splice(idx, 1);
+    target.cards.push(card);
+    card.updatedAt = now();
+  } else {
+    const j = idx + (e.key === "ArrowUp" ? -1 : 1);
+    if (j < 0 || j >= col.cards.length) return;
+    e.preventDefault();
+    [col.cards[idx], col.cards[j]] = [col.cards[j], col.cards[idx]];
+  }
+  commit();
+  if (!dialog.open) elementFor(card)?.focus();
+});
+
+// --- background ---
+
+const BG_MODES = {
+  tile:    { backgroundRepeat: "repeat",    backgroundSize: "auto",  backgroundPosition: "" },
+  center:  { backgroundRepeat: "no-repeat", backgroundSize: "auto",  backgroundPosition: "center center" },
+  stretch: { backgroundRepeat: "no-repeat", backgroundSize: "cover", backgroundPosition: "center" },
+};
+const BG_CONTRAST_SAMPLE = 64;
+const BG_DARK_THRESHOLD = 0.5;
+let bgContrastToken = 0;
+let lastContrastImage = null, lastContrastDark = false;
+
+// Sample the image's average luminance and flag the body so text over a dark
+// background can switch to light styles.
+function updateBgContrast() {
+  const bg = data.background;
+  if (!bg?.image) {
+    lastContrastImage = null;
+    document.body.classList.remove("bg-dark");
+    return;
+  }
+  if (bg.image === lastContrastImage) {
+    document.body.classList.toggle("bg-dark", lastContrastDark);
+    return;
+  }
+  const token = ++bgContrastToken;
+  const img = new Image();
+  img.onload = () => {
+    if (token !== bgContrastToken) return;
+    const w = Math.min(BG_CONTRAST_SAMPLE, img.naturalWidth) || 1;
+    const h = Math.min(BG_CONTRAST_SAMPLE, img.naturalHeight) || 1;
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    const pixelCount = px.length / 4;
+    let sum = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      sum += 0.2126 * px[i] + 0.7152 * px[i+1] + 0.0722 * px[i+2];
+    }
+    const avg = sum / pixelCount / 255;
+    lastContrastImage = bg.image;
+    lastContrastDark = avg < BG_DARK_THRESHOLD;
+    document.body.classList.toggle("bg-dark", lastContrastDark);
+  };
+  img.onerror = () => { if (token === bgContrastToken) lastContrastImage = null; };
+  img.src = bg.image;
+}
+
+function applyBackground() {
+  const bg = data.background;
+  Object.assign(document.body.style, {
+    backgroundImage: bg?.image ? `url("${bg.image}")` : "",
+    backgroundAttachment: "fixed",
+    ...(bg?.image ? (BG_MODES[bg.mode] ?? BG_MODES.tile) : {}),
+  });
+  updateBgContrast();
+}
+
+// --- settings dialog ---
+
+const settingsDialog = document.getElementById("settings-dialog");
+const tagList = document.getElementById("tag-list");
+const boardNameInput = document.getElementById("board-name-input");
+const bgPreview = document.getElementById("bg-preview");
+const bgEmpty = document.getElementById("bg-empty");
+const bgMode = document.getElementById("bg-mode");
+const bgRemoveBtn = document.getElementById("bg-remove-btn");
+let pendingBg = null; // background selection staged until the dialog is saved
+
+function rebuildTagCheckboxes() {
+  const legend = tagOptions.querySelector("legend");
+  const labels = Object.entries(data.tags).map(([name, color]) => {
+    const lbl = document.createElement("label");
+    lbl.className = "tag-option";
+    lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="--tag-bg:${color}">${name}</span>`;
+    return lbl;
+  });
+  tagOptions.replaceChildren(legend, ...labels);
+}
+
+function createTagRow(name, color) {
+  const row = document.createElement("div");
+  row.className = "tag-row";
+  row.dataset.originalName = name;
+  row.innerHTML = `<input type="color" value="${color}" class="tag-color"><input type="text" value="${esc(name)}" class="tag-name" required><button type="button" class="tag-delete-btn" title="Delete tag">&times;</button>`;
+  row.querySelector(".tag-delete-btn").addEventListener("click", () => row.remove());
+  return row;
+}
+
+function refreshBgPreview() {
+  const hasImage = !!pendingBg?.image;
+  if (hasImage) {
+    bgPreview.src = pendingBg.image;
+  } else {
+    bgPreview.removeAttribute("src");
+  }
+  bgPreview.hidden = !hasImage;
+  bgEmpty.hidden = hasImage;
+  bgMode.hidden = !hasImage;
+  bgRemoveBtn.hidden = !hasImage;
+}
+
+pickFile("bg-choose-btn", "bg-file", file => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingBg = { image: reader.result };
+    refreshBgPreview();
+  };
+  reader.readAsDataURL(file);
+});
+
+bgRemoveBtn.addEventListener("click", () => {
+  pendingBg = { image: null };
+  refreshBgPreview();
+});
+
+document.getElementById("settings-btn").addEventListener("click", () => {
+  boardNameInput.value = data.title;
+  tagList.replaceChildren(...Object.entries(data.tags).map(e => createTagRow(...e)));
+  pendingBg = { image: data.background?.image ?? null };
+  bgMode.value = data.background?.mode ?? "tile";
+  refreshBgPreview();
+  settingsDialog.returnValue = "";
+  settingsDialog.showModal();
+});
+
+document.getElementById("add-tag-btn").addEventListener("click", () => {
+  tagList.appendChild(createTagRow("", "#888888"));
+  tagList.lastElementChild.querySelector(".tag-name").focus();
+});
+
+closeOnBackdropClick(settingsDialog);
+
+settingsDialog.addEventListener("close", () => {
+  if (settingsDialog.returnValue !== "save") return;
+
+  const newName = boardNameInput.value.trim();
+  if (newName) {
+    data.title = newName;
+    document.getElementById("board-title").textContent = newName;
+  }
+
+  // Rebuild the tag map from the rows, tracking renames and deletions so the
+  // tags on cards can be updated to match.
+  const renames = {};
+  const deletions = new Set(Object.keys(data.tags));
+  const newTags = {};
+  tagList.querySelectorAll(".tag-row").forEach(row => {
+    const name = row.querySelector(".tag-name").value.trim();
+    const color = row.querySelector(".tag-color").value;
+    if (!name) return;
+    const original = row.dataset.originalName;
+    newTags[name] = color;
+    if (original) {
+      deletions.delete(original);
+      if (original !== name) renames[original] = name;
+    }
+  });
+  data.tags = newTags;
+  for (const col of data.columns) {
+    for (const card of col.cards) {
+      card.tags = (card.tags || []).map(t => renames[t] || t).filter(t => !deletions.has(t));
+    }
+  }
+  rebuildTagCheckboxes();
+
+  data.background = pendingBg?.image ? { image: pendingBg.image, mode: bgMode.value || "tile" } : null;
+  applyBackground();
+
+  commit();
+  saveBackground();
+});
+
+// --- import / export ---
+
+document.getElementById("export-btn").addEventListener("click", () => {
+  const out = { title: data.title, tags: data.tags, columns: data.columns };
+  if (data.background?.image) out.background = data.background;
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "board.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+pickFile("import-btn", "import-file", async file => {
+  try {
+    const imported = JSON.parse(await file.text());
+    if (!imported.title || !Array.isArray(imported.columns)) {
+      alert("Invalid board file.");
+      return;
+    }
+    data = {
+      title: imported.title,
+      tags: imported.tags || {},
+      columns: imported.columns,
+      background: imported.background || null,
+    };
+    document.getElementById("board-title").textContent = data.title;
+    rebuildTagCheckboxes();
+    applyBackground();
+    commit();
+    saveBackground();
+    settingsDialog.close("cancel");
+  } catch {
+    alert("Could not parse JSON file.");
+  }
+});
+
+// --- drag and drop ---
+// dragover moves the <li> directly for a live preview; the DOM order is
+// adopted into state on drop. dragend re-renders from state, which commits a
+// completed drop and snaps a cancelled drag back to where it started.
+
+let dragged = null; // the <li> being dragged
+let dragOriginColumn = null;
+let overCol = null;
+let lastY = 0;
+
+function clearDragOver() {
+  if (overCol) { overCol.classList.remove("drag-over"); overCol = null; }
+}
+
+function getDragAfterCard(ul, y) {
+  const cards = [...ul.querySelectorAll(".card:not(.dragging)")];
+  for (const card of cards) {
+    const box = card.getBoundingClientRect();
+    if (y < box.top + box.height / 2) return card;
+  }
+  return null;
+}
+
+board.addEventListener("dragstart", e => {
+  const card = e.target.closest(".card");
+  if (!card) return;
+  dragged = card;
+  dragOriginColumn = columnOf.get(card.closest(".column"));
+  card.classList.add("dragging");
+  board.classList.add("dragging");
+});
+
+board.addEventListener("dragover", e => {
+  if (!dragged) return;
+  e.preventDefault();
+  const col = e.target.closest(".column");
+  if (!col) return;
+
+  if (col !== overCol) {
+    clearDragOver();
+    overCol = col;
+    col.classList.add("drag-over");
+  }
+
+  if (Math.abs(e.clientY - lastY) < 5) return;
+  lastY = e.clientY;
+
+  const ul = col.querySelector("ul");
+  const afterCard = getDragAfterCard(ul, e.clientY);
+  if (afterCard) ul.insertBefore(dragged, afterCard);
+  else ul.appendChild(dragged);
+});
+
+board.addEventListener("drop", e => {
+  e.preventDefault();
+  if (!dragged) return;
+  for (const section of board.querySelectorAll(".column")) {
+    const col = columnOf.get(section);
+    col.cards = [...section.querySelectorAll(".card")].map(li => cardOf.get(li));
+  }
+  if (columnOf.get(dragged.closest(".column")) !== dragOriginColumn) {
+    cardOf.get(dragged).updatedAt = now();
+  }
+  save();
+});
+
+board.addEventListener("dragend", () => {
+  clearDragOver();
+  dragged = null;
+  dragOriginColumn = null;
+  lastY = 0;
+  board.classList.remove("dragging");
+  renderBoard();
+});
+
+// --- init ---
+
+function init(initial) {
+  data = initial;
+  if (navigator.storage?.persist) navigator.storage.persist();
+  document.getElementById("board-title").textContent = data.title;
+  rebuildTagCheckboxes();
+  renderBoard();
+  applyBackground();
+}
+
 const saved = localStorage.getItem("ohnoban-board");
 if (saved) {
   try {
-    const board = JSON.parse(saved);
-    board.background = readSavedBackground();
-    loadBoard(board);
+    const stored = JSON.parse(saved);
+    stored.background = readSavedBackground();
+    init(stored);
   } catch (e) {
     console.warn("Bad localStorage data, falling back to board.json", e);
     localStorage.removeItem("ohnoban-board");
-    fetch("board.json").then(r => r.json()).then(loadBoard);
+    fetch("board.json").then(r => r.json()).then(init);
   }
 } else {
-  fetch("board.json").then(r => r.json()).then(loadBoard);
+  fetch("board.json").then(r => r.json()).then(init);
 }

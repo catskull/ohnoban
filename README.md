@@ -27,7 +27,8 @@ Open `http://localhost:8000`. The board seeds from `board.json` on first load, t
 ## Files
 
 ```
-index.html       -- markup and all application logic
+index.html       -- markup
+app.js           -- application logic
 style.css        -- styles
 board.json       -- seed data (used on first load only)
 marked.min.js    -- vendored markdown parser (marked v18.0.2)
