@@ -79,5 +79,21 @@
         }
       ]
     }
+  ],
+  "notes": [
+    {
+      "title": "Notes 📝",
+      "description": "The **Notes** tab is for anything that doesn't belong on the board — reference material, scratch ideas, meeting notes.\n\nNotes have a title, markdown body, and tags, just like cards. They share the same tag palette, so renaming a tag updates notes too.",
+      "tags": ["intro", "feature"],
+      "createdAt": "2026-05-29T08:00:00.000Z",
+      "updatedAt": "2026-05-29T08:00:00.000Z"
+    },
+    {
+      "title": "Scratchpad",
+      "description": "- they don't drag or sort into columns\n- click one to view, **Edit** to change it\n- they're saved and exported right alongside the board",
+      "tags": ["tip"],
+      "createdAt": "2026-05-29T08:05:00.000Z",
+      "updatedAt": "2026-05-29T08:05:00.000Z"
+    }
   ]
 }

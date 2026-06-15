@@ -1,5 +1,5 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; }
+body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
 #board { display: flex; gap: 1rem; padding: 1rem; overflow-x: auto; align-items: start; }
 #board.dragging { align-items: stretch; }
 .column { background: #f0f0f0; border-radius: .5rem; width: 280px; flex-shrink: 0; padding: .75rem; }
@@ -44,9 +44,59 @@ ul { list-style: none; display: flex; flex-direction: column; gap: .5rem; }
 .card-view .timestamps span { display: block; }
 .tag { font-size: .7rem; font-weight: 600; padding: .15rem .5rem; border-radius: .25rem; background: var(--tag-bg); color: oklch(from var(--tag-bg) calc((0.7 - l) * infinity) 0 0); border: 1px solid oklch(from var(--tag-bg) calc(l - 0.15) c h); }
 
-header { display: flex; align-items: center; padding: .75rem 1rem; padding-right: 9rem; }
-header h1 { flex: 1; }
+header { display: flex; align-items: center; padding: .75rem 1rem; padding-right: 19rem; }
+header h1 { flex: 1; min-width: 0; }
 body.bg-dark #board-title { color: #fff; }
+
+/* Tabs sit between the action buttons in the fixed top-right cluster. */
+.tabs { display: flex; gap: .35rem; flex-shrink: 0; margin: 0 .5rem; }
+.tab { font: inherit; font-size: .85rem; background: #fff; border: 2px solid #000; border-radius: .25rem; cursor: pointer; padding: .25rem .7rem; }
+.tab:hover { background: #000; color: #fff; }
+.tab[aria-selected="true"] { background: #000; color: #fff; }
+
+/* Show exactly one view. These beat #board's own display:flex (id + class
+   specificity), which a bare [hidden] attribute can't. */
+body:not(.notes-view) #notes { display: none; }
+body.notes-view #board { display: none; }
+body.notes-view #add-column-btn { display: none; }
+#notes { flex: 1; min-height: 0; display: flex; gap: 1rem; padding: 1rem; }
+
+.notes-pane { display: flex; flex-direction: column; width: 300px; flex-shrink: 0; min-height: 0; border: 3px solid #000; background: #fff; }
+.notes-pane-head { padding: .5rem; border-bottom: 3px solid #000; flex-shrink: 0; }
+#add-note-btn { width: 100%; font: inherit; font-size: .85rem; font-weight: 600; background: #fff; border: 2px solid #000; border-radius: .25rem; cursor: pointer; padding: .4rem; }
+#add-note-btn:hover { background: #000; color: #fff; }
+.notes-list { flex: 1; min-height: 0; overflow-y: auto; display: block; }
+.note-list-item { padding: .6rem .75rem; cursor: pointer; border-bottom: 1px solid #ddd; }
+.note-list-item:hover { background: #f0f0f0; }
+.note-list-item.selected { background: #000; color: #fff; }
+.note-list-item:focus { outline: none; }
+.note-list-item:focus-visible { outline: 2px solid #0b6ff3; outline-offset: -2px; }
+.note-list-title { font-weight: 600; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-list-preview { font-size: .78rem; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: .15rem; }
+.note-list-item.selected .note-list-preview { color: #bbb; }
+
+.note-detail { flex: 1; min-width: 0; overflow-y: auto; border: 3px solid #000; background: #fff; padding: 1.25rem; display: flex; flex-direction: column; }
+.note-detail .card-view { padding: 0; }
+/* Title row carries the Edit button, anchored to the title's first line so a
+   multi-line title keeps the button at the top rather than centering it. */
+.note-detail .card-view > strong { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+.note-title-text { min-width: 0; overflow-wrap: anywhere; }
+.note-detail-empty { color: #666; }
+.note-edit-btn { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; flex-shrink: 0; }
+.note-edit-btn:hover { background: #fff; color: #000; }
+
+.note-editor { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .75rem; }
+.note-editor > label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; font-weight: 600; }
+.note-editor input[name="title"], .note-editor textarea { font: inherit; padding: .4rem .5rem; border: 2px solid #000; border-radius: .25rem; }
+.note-editor-desc { flex: 1; min-height: 0; }
+.note-editor-desc textarea { flex: 1; min-height: 8rem; resize: vertical; }
+.note-editor fieldset { border: none; padding: 0; min-inline-size: 0; }
+.note-editor legend { font-size: .85rem; font-weight: 600; margin-bottom: .35rem; }
+.note-editor-actions { display: flex; gap: .5rem; }
+.note-editor-actions button { font: inherit; font-size: .85rem; font-weight: 600; padding: .4rem .75rem; border: 2px solid #000; border-radius: .25rem; cursor: pointer; background: #000; color: #fff; }
+.note-editor-actions .note-cancel-btn { background: #fff; color: #000; }
+.note-editor-actions .note-delete-btn { background: #c23030; border-color: #c23030; }
+.note-editor-actions .note-delete-btn:hover { background: #fff; color: #c23030; }
 .header-actions { position: fixed; top: 0; right: 1rem; padding: .75rem 0; display: flex; align-items: center; gap: .5rem; z-index: 10; }
 #add-column-btn, #settings-btn { font: inherit; font-size: .85rem; background: #fff; border: 2px solid #000; border-radius: .25rem; cursor: pointer; padding: .25rem .5rem; }
 #add-column-btn:hover, #settings-btn:hover { background: #000; color: #fff; }

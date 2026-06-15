@@ -5,6 +5,7 @@ A personal kanban board that runs entirely in the browser. No backend, no build 
 ## Features
 
 - **Drag and drop** cards between columns and reorder within columns
+- **Notes** -- a separate tab for standalone notes (title, tags, markdown body) that don't live on the board
 - **Markdown descriptions** with bold, italic, links, lists, and code blocks
 - **Color-coded tags** with auto-contrasting text (light/dark) via CSS `oklch`
 - **Card dialog** with view and edit modes
@@ -56,6 +57,13 @@ The board is stored as JSON, both in localStorage and in exported files:
           "tags": ["bug"]
         }
       ]
+    }
+  ],
+  "notes": [
+    {
+      "title": "Note title",
+      "description": "Markdown **body**",
+      "tags": ["feature"]
     }
   ]
 }

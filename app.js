@@ -66,9 +66,13 @@ const cardOf = new WeakMap();   // card <li> -> card object in data
 const columnOf = new WeakMap(); // column <section> -> column object in data
 
 const board = document.getElementById("board");
+const notesListEl = document.getElementById("notes-list");
+const noteDetailEl = document.getElementById("note-detail");
+let selectedNote = null; // the note shown in the detail pane, null when none
 
 function commit() {
   renderBoard();
+  renderNotes();
   save();
 }
 
@@ -76,8 +80,25 @@ function columnContaining(card) {
   return data.columns.find(col => col.cards.includes(card));
 }
 
-function elementFor(card) {
-  return [...board.querySelectorAll(".card")].find(li => cardOf.get(li) === card);
+// Every card and note, flattened — used when tag edits must touch them all.
+function allItems() {
+  return [...data.columns.flatMap(col => col.cards), ...data.notes];
+}
+
+function elementFor(item) {
+  return [...board.querySelectorAll(".card")].find(li => cardOf.get(li) === item);
+}
+
+// Create a new item, or update an existing one in place — bumping updatedAt
+// only when a field actually changed. Returns the item either way.
+function writeItem(item, { title, description, tags }) {
+  if (!item) return { title, description, tags, createdAt: now(), updatedAt: now() };
+  const changed = item.title !== title ||
+    (item.description || "") !== description ||
+    (item.tags || []).slice().sort().join("\n") !== tags.slice().sort().join("\n");
+  Object.assign(item, { title, description, tags });
+  if (changed) item.updatedAt = now();
+  return item;
 }
 
 // --- persistence ---
@@ -176,13 +197,121 @@ function renderBoard() {
   board.replaceChildren(...data.columns.map(renderColumn));
 }
 
+// Notes use a master-detail layout: a scrollable list on the left, the one
+// selected note rendered on the right.
+function renderNoteListItem(note) {
+  const li = document.createElement("li");
+  li.className = "note-list-item";
+  if (note === selectedNote) li.classList.add("selected");
+  li.tabIndex = 0;
+  li.setAttribute("role", "button");
+  cardOf.set(li, note);
+  const preview = (note.description || "").replace(/\s+/g, " ").trim();
+  li.innerHTML = `<div class="note-list-title">${esc(note.title || "Untitled")}</div>` +
+    (preview ? `<div class="note-list-preview">${esc(preview)}</div>` : "");
+  return li;
+}
+
+function renderNoteDetail() {
+  if (!data.notes.includes(selectedNote)) selectedNote = null;
+  if (!selectedNote) {
+    const p = document.createElement("p");
+    p.className = "note-detail-empty";
+    p.textContent = data.notes.length
+      ? "Select a note to view it."
+      : "No notes yet. Use “+ Note” to create one.";
+    noteDetailEl.replaceChildren(p);
+    return;
+  }
+  const body = document.createElement("div");
+  body.className = "card-view";
+  fillCard(body, selectedNote);
+  // Wrap the title text so it can shrink/wrap while the Edit button stays put.
+  const strong = body.querySelector("strong");
+  const titleText = document.createElement("span");
+  titleText.className = "note-title-text";
+  titleText.append(...strong.childNodes);
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "note-edit-btn";
+  editBtn.textContent = "Edit";
+  strong.append(titleText, editBtn);
+  noteDetailEl.replaceChildren(body);
+}
+
+function renderNotes() {
+  notesListEl.replaceChildren(...data.notes.map(renderNoteListItem));
+  renderNoteDetail();
+}
+
+// Open a note in the detail pane without rebuilding the list (keeps focus).
+function selectNote(note) {
+  selectedNote = note;
+  notesListEl.querySelectorAll(".note-list-item").forEach(li => {
+    li.classList.toggle("selected", cardOf.get(li) === note);
+  });
+  renderNoteDetail();
+}
+
+// Edit a note in place in the detail pane (note === null when creating one).
+function showNoteEditor(note) {
+  const form = document.createElement("form");
+  form.className = "note-editor";
+  form.innerHTML = `
+    <label>Title<input name="title" required></label>
+    <label class="note-editor-desc">Description<textarea name="description"></textarea></label>
+    <fieldset class="note-tags"><legend>Tags</legend></fieldset>
+    <div class="note-editor-actions">
+      <button type="submit">Save</button>
+      <button type="button" class="note-cancel-btn">Cancel</button>
+      ${note ? `<button type="button" class="note-delete-btn">Delete</button>` : ""}
+    </div>
+  `;
+  form.title.value = note?.title || "";
+  form.description.value = note?.description || "";
+  form.querySelector(".note-tags").append(...tagCheckboxLabels(note?.tags || []));
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    saveNoteEditor(form, note);
+  });
+  form.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); renderNoteDetail(); }
+  });
+  form.querySelector(".note-cancel-btn").addEventListener("click", renderNoteDetail);
+  if (note) form.querySelector(".note-delete-btn").addEventListener("click", () => deleteNote(note));
+  noteDetailEl.replaceChildren(form);
+  form.title.focus();
+}
+
+function deleteNote(note) {
+  const i = data.notes.indexOf(note);
+  if (i < 0) return;
+  if (!confirm(`Delete note “${note.title || "Untitled"}”?`)) return;
+  data.notes.splice(i, 1);
+  selectedNote = data.notes[i] || data.notes[i - 1] || null;
+  commit();
+}
+
+function saveNoteEditor(form, note) {
+  const title = form.title.value.trim();
+  if (!title) return;
+  const description = form.description.value.trim();
+  const tags = [...form.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value);
+  const item = writeItem(note, { title, description, tags });
+  if (!note) {
+    data.notes.push(item);
+    selectedNote = item;
+  }
+  commit();
+}
+
 // --- board interactions (delegated) ---
 
 board.addEventListener("click", e => {
   const addLink = e.target.closest(".add-card");
   if (addLink) {
     e.preventDefault();
-    openNewCardDialog(columnOf.get(addLink.closest(".column")));
+    openNewItemDialog(columnOf.get(addLink.closest(".column")).cards);
     return;
   }
 
@@ -199,14 +328,14 @@ board.addEventListener("click", e => {
   if (e.target.closest("a[href]")) return; // links inside card descriptions
 
   const li = e.target.closest(".card");
-  if (li) openCardDialog(cardOf.get(li));
+  if (li) openItemDialog(cardOf.get(li), columnOf.get(li.closest(".column")).cards);
 });
 
 board.addEventListener("keydown", e => {
   if (e.key !== "Enter" && e.key !== " ") return;
   if (!e.target.classList.contains("card")) return;
   e.preventDefault();
-  openCardDialog(cardOf.get(e.target));
+  openItemDialog(cardOf.get(e.target), columnOf.get(e.target.closest(".column")).cards);
 });
 
 document.getElementById("add-column-btn").addEventListener("click", () => {
@@ -214,6 +343,45 @@ document.getElementById("add-column-btn").addEventListener("click", () => {
   if (!title) return;
   data.columns.push({ id: title.toLowerCase().replace(/\s+/g, "-"), title, cards: [] });
   commit();
+});
+
+// --- views (board / notes tabs) ---
+
+const tabBar = document.querySelector(".tabs");
+const addNoteBtn = document.getElementById("add-note-btn");
+
+// The `notes-view` body class is the single source of truth for which view
+// shows; CSS hides #board / #notes / +Column off it.
+function setView(view) {
+  const isBoard = view === "board";
+  document.body.classList.toggle("notes-view", !isBoard);
+  tabBar.querySelectorAll(".tab").forEach(tab => {
+    tab.setAttribute("aria-selected", String(tab.dataset.view === view));
+  });
+  if (!isBoard && !selectedNote && data.notes.length) selectNote(data.notes[0]);
+}
+
+tabBar.addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  if (tab) setView(tab.dataset.view);
+});
+
+addNoteBtn.addEventListener("click", () => showNoteEditor(null));
+
+notesListEl.addEventListener("click", e => {
+  const li = e.target.closest(".note-list-item");
+  if (li) selectNote(cardOf.get(li));
+});
+
+notesListEl.addEventListener("keydown", e => {
+  const li = e.target.closest(".note-list-item");
+  if (!li || (e.key !== "Enter" && e.key !== " ")) return;
+  e.preventDefault();
+  selectNote(cardOf.get(li));
+});
+
+noteDetailEl.addEventListener("click", e => {
+  if (e.target.closest(".note-edit-btn")) showNoteEditor(selectedNote);
 });
 
 // --- columns ---
@@ -288,8 +456,11 @@ const dialog = document.getElementById("card-dialog");
 const form = dialog.querySelector("form");
 const cardView = dialog.querySelector(".card-view");
 const tagOptions = document.getElementById("tag-options");
-let editingCard = null;  // card object being viewed/edited, null when adding
-let targetColumn = null; // column object receiving a new card
+// The dialog edits an item (a card). editingContainer is the array it belongs
+// to — for an existing item, where it lives (for delete); for a new one, where
+// it gets pushed. editingItem is null when adding.
+let editingItem = null;
+let editingContainer = null;
 
 function setMode(mode) {
   const viewing = mode === "view";
@@ -297,26 +468,26 @@ function setMode(mode) {
   dialog.querySelector(".card-edit").hidden = viewing;
   dialog.querySelector(".view-actions").hidden = !viewing;
   dialog.querySelector(".edit-actions").hidden = viewing;
-  dialog.querySelector(".delete-btn").hidden = !editingCard;
+  dialog.querySelector(".delete-btn").hidden = !editingItem;
 }
 
-function openCardDialog(card) {
-  editingCard = card;
-  targetColumn = null;
-  form.title.value = card.title;
-  form.description.value = card.description || "";
+function openItemDialog(item, container) {
+  editingItem = item;
+  editingContainer = container;
+  form.title.value = item.title;
+  form.description.value = item.description || "";
   form.querySelectorAll('input[name="tags"]').forEach(cb => {
-    cb.checked = (card.tags || []).includes(cb.value);
+    cb.checked = (item.tags || []).includes(cb.value);
   });
-  fillCard(cardView, card);
+  fillCard(cardView, item);
   setMode("view");
   dialog.returnValue = "";
   dialog.showModal();
 }
 
-function openNewCardDialog(col) {
-  editingCard = null;
-  targetColumn = col;
+function openNewItemDialog(container) {
+  editingItem = null;
+  editingContainer = container;
   form.reset();
   setMode("edit");
   dialog.returnValue = "";
@@ -332,27 +503,18 @@ dialog.addEventListener("close", () => {
     const description = form.description.value.trim();
     const tags = [...form.querySelectorAll('input[name="tags"]:checked')].map(cb => cb.value);
     if (title) {
-      let card = editingCard;
-      if (card) {
-        const changed = card.title !== title ||
-          (card.description || "") !== description ||
-          (card.tags || []).slice().sort().join("\n") !== tags.slice().sort().join("\n");
-        Object.assign(card, { title, description, tags });
-        if (changed) card.updatedAt = now();
-      } else {
-        card = { title, description, tags, createdAt: now(), updatedAt: now() };
-        targetColumn.cards.push(card);
-      }
+      const item = writeItem(editingItem, { title, description, tags });
+      if (!editingItem) editingContainer.push(item);
       commit();
-      elementFor(card)?.focus();
+      elementFor(item)?.focus();
     }
-  } else if (dialog.returnValue === "delete" && editingCard) {
-    const col = columnContaining(editingCard);
-    col.cards = col.cards.filter(c => c !== editingCard);
+  } else if (dialog.returnValue === "delete" && editingItem) {
+    const i = editingContainer.indexOf(editingItem);
+    if (i >= 0) editingContainer.splice(i, 1);
     commit();
   }
-  editingCard = null;
-  targetColumn = null;
+  editingItem = null;
+  editingContainer = null;
   form.description.style.height = "";
 });
 
@@ -362,9 +524,10 @@ document.addEventListener("keydown", e => {
   if (!e.key.startsWith("Arrow")) return;
   const tag = e.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
-  const card = dialog.open ? editingCard : cardOf.get(e.target);
+  const card = dialog.open ? editingItem : cardOf.get(e.target);
   if (!card) return;
   const col = columnContaining(card);
+  if (!col) return; // notes have no column and don't move with arrow keys
   const idx = col.cards.indexOf(card);
 
   if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -456,15 +619,28 @@ const bgMode = document.getElementById("bg-mode");
 const bgRemoveBtn = document.getElementById("bg-remove-btn");
 let pendingBg = null; // background selection staged until the dialog is saved
 
-function rebuildTagCheckboxes() {
-  const legend = tagOptions.querySelector("legend");
-  const labels = Object.entries(data.tags).map(([name, color]) => {
+// A <label> + checkbox per tag, with those in `checked` pre-ticked.
+function tagCheckboxLabels(checked) {
+  return Object.entries(data.tags).map(([name, color]) => {
     const lbl = document.createElement("label");
     lbl.className = "tag-option";
-    lbl.innerHTML = `<input type="checkbox" name="tags" value="${name}"><span class="tag" style="--tag-bg:${color}">${name}</span>`;
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.name = "tags";
+    cb.value = name;
+    cb.checked = checked.includes(name);
+    const span = document.createElement("span");
+    span.className = "tag";
+    span.style.setProperty("--tag-bg", color);
+    span.textContent = name;
+    lbl.append(cb, span);
     return lbl;
   });
-  tagOptions.replaceChildren(legend, ...labels);
+}
+
+function rebuildTagCheckboxes() {
+  const legend = tagOptions.querySelector("legend");
+  tagOptions.replaceChildren(legend, ...tagCheckboxLabels([]));
 }
 
 function createTagRow(name, color) {
@@ -546,10 +722,8 @@ settingsDialog.addEventListener("close", () => {
     }
   });
   data.tags = newTags;
-  for (const col of data.columns) {
-    for (const card of col.cards) {
-      card.tags = (card.tags || []).map(t => renames[t] || t).filter(t => !deletions.has(t));
-    }
+  for (const item of allItems()) {
+    item.tags = (item.tags || []).map(t => renames[t] || t).filter(t => !deletions.has(t));
   }
   rebuildTagCheckboxes();
 
@@ -563,7 +737,7 @@ settingsDialog.addEventListener("close", () => {
 // --- import / export ---
 
 document.getElementById("export-btn").addEventListener("click", () => {
-  const out = { title: data.title, tags: data.tags, columns: data.columns };
+  const out = { title: data.title, tags: data.tags, columns: data.columns, notes: data.notes };
   if (data.background?.image) out.background = data.background;
   const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
@@ -584,8 +758,10 @@ pickFile("import-btn", "import-file", async file => {
       title: imported.title,
       tags: imported.tags || {},
       columns: imported.columns,
+      notes: Array.isArray(imported.notes) ? imported.notes : [],
       background: imported.background || null,
     };
+    selectedNote = data.notes[0] || null;
     document.getElementById("board-title").textContent = data.title;
     rebuildTagCheckboxes();
     applyBackground();
@@ -676,11 +852,15 @@ board.addEventListener("dragend", () => {
 
 function init(initial) {
   data = initial;
+  if (!Array.isArray(data.notes)) data.notes = []; // boards saved before notes existed
+  selectedNote = data.notes[0] || null;
   if (navigator.storage?.persist) navigator.storage.persist();
   document.getElementById("board-title").textContent = data.title;
   rebuildTagCheckboxes();
   renderBoard();
+  renderNotes();
   applyBackground();
+  setView("board");
 }
 
 const saved = localStorage.getItem("ohnoban-board");

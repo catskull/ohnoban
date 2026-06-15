@@ -11,8 +11,21 @@
     <h1 id="board-title"></h1>
   </header>
   <main id="board"></main>
+  <section id="notes">
+    <div class="notes-pane">
+      <div class="notes-pane-head">
+        <button id="add-note-btn" type="button">+ Note</button>
+      </div>
+      <ul class="notes-list" id="notes-list"></ul>
+    </div>
+    <div class="note-detail" id="note-detail"></div>
+  </section>
   <div class="header-actions">
     <button id="add-column-btn" type="button" title="Add column">+ Column</button>
+    <nav class="tabs" role="tablist">
+      <button class="tab" type="button" role="tab" data-view="board" aria-selected="true">Board</button>
+      <button class="tab" type="button" role="tab" data-view="notes" aria-selected="false">Notes</button>
+    </nav>
     <button id="settings-btn" type="button" title="Board settings">&#9881;</button>
   </div>
 
